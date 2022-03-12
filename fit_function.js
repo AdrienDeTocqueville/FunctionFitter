@@ -54,17 +54,59 @@ function lerp(a, t, b)
     return (1 - t) * a + t * b;
 }
 
-function truncate(x)
+function truncate(x, precision=2)
 {
-    return round(100*x)/100
+    return Number(x.toFixed(precision))
 }
 
 async function main()
 {
     await add_lut("FGD_64.png", "FGD");
     add_variable("TRANSFORM_FGD", "checkbox", false);
-    add_variable("FGD_LAYER", "number", 1);
+    add_variable("FGD_LAYER", "number", 0);
     add_function(fgd_ref, true);
     add_function(fgd_lazarov, false);
 }
 main()
+
+/*
+function predict(x)
+{
+	return tf.tidy(() => {
+		x = tf.tensor(x);
+		let res = coefs[0];
+		let x_p = x;
+		for (let i = 1; i < coefs.length; i++)
+		{
+			res = res.add(x_p.mul(coefs[i]));
+			x_p = x_p.mul(x);
+		}
+		return res;
+	});
+}
+
+function loss(estimate, target)
+{
+	return tf.tidy(() => {
+		return estimate.sub(tf.tensor(target)).square().mean();
+	});
+}
+
+function fit_function()
+{
+    const learningRate = 0.1;
+    const optimizer = tf.train.adam(learningRate);
+
+	let res = optimizer.minimize(() => {
+		return loss(predict(px), py);
+	}, true);
+
+	if (res.dataSync() > 0.005)
+	{
+		draw();
+		setTimeout(fit, 10);
+	}
+	else
+		draw('rgb(0, 200, 0');
+}
+*/
