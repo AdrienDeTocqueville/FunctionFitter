@@ -1,17 +1,23 @@
 $settings = {
     LUTs: {},
     plots: {},
+    models: {},
     dimensions: 0,
     graph_dimensions: 2,
     parameters: null,
     sliders: null,
 };
 
-var shape_selector = document.querySelector("#shape-selector");
+let shape_selector = document.querySelector("#shape-selector");
 shape_selector.onchange = () => {
     $settings.graph_dimensions = parseInt(shape_selector.value);
     dirty_functions();
 }
+
+let default_func = `function new_function(x, y)
+{
+    return x + y;
+}`;
 
 hook_add_buttons();
 
@@ -19,28 +25,23 @@ hook_add_buttons();
 
 function add_list_element(list, style)
 {
-    var li = document.createElement("li");
+    let li = document.createElement("li");
     li.className = "list-group-item";
     li.style = style;
 
     for (let i = 2; i < arguments.length; i++)
         li.appendChild(arguments[i]);
 
-    let luts = document.querySelector(list);
-    luts.appendChild(li);
+    document.querySelector(list).appendChild(li);
 }
 
 function hook_add_buttons()
 {
-    var default_func = `function new_function(x, y)
-{
-    return x + y;
-}`;
     document.querySelector("#add_lut").onclick = () => {
         add_lut(null, "new_lut");
     }
-    document.querySelector("#add_func").onclick = () => {
-        add_function(default_func, false);
+    document.querySelector("#add_ref").onclick = () => {
+        add_reference(default_func, false);
     }
 }
 
@@ -52,7 +53,7 @@ function load_lut_async(url, name, canvas)
         let img = new Image();
         img.setAttribute('crossOrigin', '');
         img.onload = () => {
-            var context = canvas.getContext('2d');
+            let context = canvas.getContext('2d');
 
             context.setTransform(1, 0, 0, 1, 0, 0);
             context.scale(canvas.width / img.width, canvas.height / img.height);
@@ -62,7 +63,7 @@ function load_lut_async(url, name, canvas)
             data = context.getImageData(0, 0, img.width, img.height);
             data.bilinear = true;
 
-            var shouldReload = $settings.LUTs[name] != null;
+            let shouldReload = $settings.LUTs[name] != null;
             $settings.LUTs[name] = data;
 
             if (shouldReload)
@@ -79,9 +80,9 @@ function add_lut(url, name)
     if (name == null)
         name = url.replace(/\.[^/.]+$/, "");
 
-    var canvas = document.createElement("canvas");
+    let canvas = document.createElement("canvas");
     canvas.className = "lut-canvas";
-    canvas.style = "padding-right: 20px";
+    canvas.style = "margin-right: 20px";
     canvas.width = canvas.height = 64;
     canvas.onclick = async () => {
         const pickerOpts = {
@@ -94,48 +95,37 @@ function add_lut(url, name)
         };
         [fileHandle] = await window.showOpenFilePicker(pickerOpts);
         let file = await fileHandle.getFile();
-        var fr = new FileReader();
+        let fr = new FileReader();
         fr.readAsDataURL(file);
         fr.onloadend = function() {
             load_lut_async(fr.result, name, canvas);
         }
     }
 
-    var input = document.createElement("input");
+    let input = document.createElement("input");
     input.style = "height:25px; width: 100%";
     input.className = "form-control";
     input.value = name;
     input.type = 'text';
     input.onchange = () => {
-        var lut = $settings.LUTs[name];
+        let lut = $settings.LUTs[name];
         $settings.LUTs[name] = null;
         name = input.value;
         $settings.LUTs[name] = lut;
         dirty_functions();
     };
 
-    var box = document.createElement("input");
-    box.style = "margin-right: 5px";
-    box.className = "form-check-input";
-    box.checked = true;
-    box.type = 'checkbox';
-    box.id = "bilinear-" + name;
-    box.onchange = () => {
+    let [box, label] = create_input("Bilinear Filtering", "checkbox", true, "bilinear-" + name, () => {
         $settings.LUTs[name].bilinear = box.checked;
         dirty_functions();
-    };
+    });
 
-    var label = document.createElement("label");
-    label.className = "form-check-label";
-    label.htmlFor = box.id;
-    label.innerHTML = "Bilinear Filtering";
-
-    var div = document.createElement("div");
+    let div = document.createElement("div");
     div.style = "padding-top: 9px";
     div.appendChild(box);
     div.appendChild(label);
 
-    var div2 = document.createElement("div");
+    let div2 = document.createElement("div");
     div2.appendChild(input);
     div2.appendChild(div);
 
@@ -154,61 +144,139 @@ function add_variable(name, type, initial_value)
     //  - text
     //  - range (doesn't support min/max)
 
-    var input = document.createElement("input");
-    input.id = "variable-" + name;
-    input.className = "form-control";
-    input.type = type;
-
-    if (type == "checkbox")
-    {
-        input.className = "form-check-input";
-        input.checked = initial_value;
-
-        input.onchange = () => {
-            window[name] = input.checked;
-            dirty_functions();
-        };
-    }
-    else
-    {
-        input.style = "height: 24px";
-        input.value = initial_value;
-
-        input.onchange = () => {
-            window[name] = type == "number" ? input.valueAsNumber : input.value;
-            dirty_functions();
-        };
-    }
-
-    var label = document.createElement("label");
-    label.style = "margin-right: 30px";
-    label.className = "form-check-label";
-    label.htmlFor = input.id;
-    label.innerHTML = name;
-
     window[name] = initial_value;
+
+    let [input, label] = create_input(name, type, initial_value, "variable-" + name, () => {
+        props = {
+            checkbox: "checked",
+            number: "valueAsNumber",
+            text: "value",
+        };
+
+        window[name] = input[props[type]];
+        dirty_functions();
+    });
+
+    label.style = "margin-right: 30px";
 
     add_list_element('#variable_list', "display: flex; flex-direction: row", label, input);
 }
 
+
 /// FUNCTIONS
 
-function add_function(code, display)
+function parse_parameters(code)
 {
-    var fn = eval("(" + code + ")");
-
-    // Parse function parameters
-    var STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
-    var FN_ARGS = /^function\s*[^\(]*\(\s*([^\)]*)\)/m;
-    var FN_ARG_SPLIT = /,/;
-    var FN_ARG = /^\s*(_?)(.+?)\1\s*$/;
+    let STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
+    let FN_ARGS = /^function\s*[^\(]*\(\s*([^\)]*)\)/m;
+    let FN_ARG_SPLIT = /,/;
     fnText = code.replace(STRIP_COMMENTS, '');
     argDecl = fnText.match(FN_ARGS);
     parameters = argDecl[1].split(FN_ARG_SPLIT);
     for (let i = 0; i < parameters.length; i++)
         parameters[i] = parameters[i].trim();
+    return parameters;
+}
 
-    // Update parameter sliders
+function create_code_editor(code, div, min_line_count, onChange)
+{
+    let line_count = Math.min(min_line_count, code.split(/\r\n|\r|\n/).length);
+    div.style = `height: ${line_count*17 + 8}px`;
+    div.className = "editor";
+    div.innerHTML = code;
+
+    let editor = ace.edit(div);
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/javascript");
+    editor.renderer.setScrollMargin(4, 0);
+
+    let refresher;
+    editor.session.on('change', function(delta) {
+        clearTimeout(refresher);
+        refresher = setTimeout(function() {
+            for (let annotation of editor.getSession().getAnnotations())
+                if (annotation.type == "error") return;
+            onChange(editor.getValue());
+        }, 500);
+    });
+}
+
+function add_model(code)
+{
+    let fn = eval("(" + code + ")");
+    parameter = parse_parameters(code);
+
+    let editor = document.createElement("div");
+    editor.id = "editor-" + fn.name;
+
+    add_list_element('#model_list', "", editor);
+
+    create_code_editor(code, editor, 10, (new_code) => {
+        if ($settings.plots[fn.name].display == false)
+            return;
+
+        let new_func;
+        try {
+            new_func = eval("(" + new_code + ")");
+        } catch (error) { return; } // Syntax error
+
+        let predict = (x) => new_func(x, ...variables);
+        $settings.models[fn.name].predict = predict;
+        $settings.plots[fn.name].predict = predict;
+        $settings.plots[fn.name].data = null;
+        redraw_plots();
+    });
+
+    let variables = [];
+    for (let i = 1; i < parameters.length; i++)
+        variables.push( tf.variable(tf.scalar(Math.random())) );
+
+    let predict = (x) => fn(x, ...variables);
+
+    $settings.models[fn.name] = { variables, predict };
+    $settings.plots[fn.name] = { data: null, display: true, predict, parameters };
+}
+
+function add_reference(code, display)
+{
+    let fn = eval("(" + code + ")");
+    parameter = parse_parameters(code);
+    generate_sliders(parameters);
+
+    let [input, label] = create_input("Display", "checkbox", display, "display-" + fn.name, () => {
+        $settings.plots[fn.name].display = input.checked;
+        redraw_plots();
+    });
+
+    let editor = document.createElement("div");
+    editor.id = "editor-" + fn.name;
+
+    add_list_element('#reference_list', "", input, label, editor);
+
+    create_code_editor(code, editor, 10, (new_code) => {
+        if ($settings.plots[fn.name].display == false)
+            return;
+
+        let new_func;
+        try {
+            new_func = eval("(" + new_code + ")");
+            new_func(...new Array($settings.dimensions - 1).fill(0));
+        } catch (error) { return; } // Syntax error
+
+        $settings.plots[fn.name].func = new_func;
+        $settings.plots[fn.name].data = null;
+        redraw_plots();
+    });
+
+    $settings.plots[fn.name] = { func: fn, data: null, display, parameters };
+    if (display)
+        redraw_plots();
+}
+
+/// SLIDERS
+
+function generate_sliders(parameters)
+{
     if ($settings.parameters == null)
     {
         $settings.dimensions = parameters.length + 1;
@@ -236,60 +304,7 @@ function add_function(code, display)
                 $settings.parameters[i].name += ", " + parameters[i];
         }
     }
-
-    var input = document.createElement("input");
-    input.className = "form-check-input";
-    input.style = "margin-right: 5px";
-    input.id = "display-" + fn.name;
-    input.type = "checkbox";
-    input.checked = display;
-    input.onchange = () => {
-        $settings.plots[fn.name].display = input.checked;
-        redraw_plots();
-    };
-
-    var label = document.createElement("label");
-    label.className = "form-check-label";
-    label.htmlFor = input.id;
-    label.innerHTML = "Display";
-
-    var editor = document.createElement("div");
-    editor.className = "editor";
-    editor.id = "editor-" + fn.name;
-    editor.innerHTML = code;
-
-    add_list_element('#function_list', "height: 300px", input, label, editor);
-
-    var aceEditor = ace.edit(editor);
-    aceEditor.setTheme("ace/theme/monokai");
-    aceEditor.session.setMode("ace/mode/javascript");
-
-    aceEditor.session.on('change', function(delta) {
-        if ($settings.plots[fn.name].display == false)
-            return;
-
-        let refresher;
-        clearTimeout(refresher);
-        refresher = setTimeout(function() {
-            for (let annotation of aceEditor.getSession().getAnnotations())
-                if (annotation.type == "error") return;
-            let new_func;
-            try {
-                new_func = eval("(" + aceEditor.getValue() + ")");
-                new_func(...new Array($settings.dimensions - 1).fill(0));
-            } catch (error) { return; } // Syntax error
-
-            $settings.plots[fn.name].func = new_func;
-            $settings.plots[fn.name].data = null;
-            redraw_plots();
-        }, 500);
-    });
-
-    $settings.plots[fn.name] = { func: fn, data: null, display, parameters };
-    if (display) redraw_plots();
 }
-
-/// SLIDERS
 
 function ensure_sliders()
 {
@@ -358,6 +373,43 @@ function on_slider_change(index)
     dirty_functions(false);
 }
 
+/// HTML
+
+function create_input(name, type, value, id, onChange)
+{
+    classes = {
+        checkbox: "form-check-input",
+        number: "form-control",
+        text: "form-control",
+    };
+
+    let input = document.createElement("input");
+    input.className = classes[type];
+    input.onchange = onChange;
+    input.type = type;
+    input.id = id;
+
+    if (type == 'checkbox')
+    {
+        input.style = "margin-right: 5px";
+        input.checked = value;
+    }
+    else
+    {
+        input.style = "height: 24px";
+        input.value = value;
+    }
+
+    if (name == null)
+        return input;
+
+    let label = document.createElement("label");
+    label.htmlFor = id;
+    label.innerHTML = name;
+
+    return [input, label];
+}
+
 /// PLOT
 
 function dirty_functions(rebuild_sliders=true)
@@ -372,7 +424,6 @@ function redraw_plots(rebuild_sliders=true)
     if (rebuild_sliders)
         ensure_sliders();
 
-    let plot_name = "";
     traces = [];
     for (let name in $settings.plots)
     {
@@ -380,15 +431,12 @@ function redraw_plots(rebuild_sliders=true)
         if (!plot.display) continue;
         if (plot.data == null) evaluate_func(plot);
 
+        plot.data.name = name;
         traces.push(plot.data);
-        if (plot_name.length != 0)
-            plot_name += ", ";
-        plot_name += name;
     }
 
     let div = document.querySelector('#plot');
     Plotly.react(div, traces, {
-        title: plot_name,
         width: "50%",
         xaxis: { range: [-0.1, 1.1] },
         yaxis: { range: [-0.1, 1.1] },
@@ -398,11 +446,14 @@ function redraw_plots(rebuild_sliders=true)
 function evaluate_func(plot)
 {
     let trace = null;
+    let resolution_x = 64;
+    let resolution_y = 64;
+
     if ($settings.graph_dimensions == 2)
     {
-        trace ={
-            x: [],
-            y: [],
+        trace = {
+            x: new Array(resolution_x),
+            y: new Array(resolution_x),
             type: "line"
         };
 
@@ -420,26 +471,49 @@ function evaluate_func(plot)
                 break;
         }
 
-        let resolution_x = 64;
         for (let i = 0; i < resolution_x; i++)
+            trace.x[i] = i / (resolution_x - 1);
+
+        if (plot.predict != null)
         {
-            let x = i / (resolution_x - 1);
-            parameters[remaining] = x;
-            trace.x.push(x);
-            trace.y.push(plot.func(...parameters));
+            for (let i = 0; i < parameters.length; i++)
+            {
+                if (i != remaining)
+                    parameters[i] = tf.scalar(parameters[i]);
+            }
+
+            for (let i = 0; i < resolution_x; i++)
+            {
+                tf.tidy(() => {
+                    parameters[remaining] = tf.tensor(trace.x[i]);
+                    trace.y[i] = plot.predict(parameters).dataSync()[0];
+                });
+            }
+
+            for (let i = 0; i < parameters.length; i++)
+            {
+                if (i != remaining)
+                    tf.dispose(parameters[i]);
+            }
+        }
+        else
+        {
+            for (let i = 0; i < resolution_x; i++)
+            {
+                parameters[remaining] = trace.x[i];
+                trace.y[i] = plot.func(...parameters);
+            }
         }
     }
     else if ($settings.graph_dimensions == 3)
     {
-        trace ={
+        trace = {
             x: [],
             y: [],
             z: [],
             type: "surface"
         };
 
-        let resolution_x = 64;
-        let resolution_y = 64;
         for (let i = 0; i < resolution_x; i++)
         {
             let x = i / (resolution_x - 1);

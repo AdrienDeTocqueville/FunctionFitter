@@ -15,14 +15,6 @@
 		  border-top: 1px solid rgba(0, 0, 0, 0.1);
 		}
 
-    .editor {
-        position: absolute;
-        top: 40px;
-        right: 5px;
-        bottom: 5px;
-        left: 5px;
-    }
-
 		.lut-canvas:hover {
 			filter: brightness(70%);
 		}
@@ -66,14 +58,21 @@
 			<ul id="variable_list" style="padding-right: 20px; padding-left: 10px"> </ul>
 
    		<hr/>
-			<h3>Functions
-				<button type="button" class="btn btn-outline-secondary add-button" id="add_func">+</button>
+			<h3>Models
+				<button type="button" class="btn btn-outline-secondary add-button" id="add_model">+</button>
 			</h3>
-			<ul id="function_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+			<ul id="model_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+
+   		<hr/>
+			<h3>References
+				<button type="button" class="btn btn-outline-secondary add-button" id="add_ref">+</button>
+			</h3>
+			<ul id="reference_list" style="padding-right: 20px; padding-left: 10px"> </ul>
 
    		<hr/>
 			<button type="button" class="btn btn-primary" onclick="fit_function()">Fit function</button>
 		</div>
+
 
 	</main>
 
