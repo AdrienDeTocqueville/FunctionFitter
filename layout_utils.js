@@ -2,6 +2,7 @@ $settings = {
     LUTs: {},
     plots: {},
     models: {},
+    references: [],
     dimensions: 0,
     graph_dimensions: 2,
     parameters: null,
@@ -115,7 +116,7 @@ function add_lut(url, name)
         dirty_functions();
     };
 
-    let [box, label] = create_input("Bilinear Filtering", "checkbox", true, "bilinear-" + name, () => {
+    let [box, label] = create_input("checkbox", true, {label: "Bilinear Filtering"}, "bilinear-" + name, () => {
         $settings.LUTs[name].bilinear = box.checked;
         dirty_functions();
     });
@@ -136,24 +137,25 @@ function add_lut(url, name)
 
 /// VARIABLES
 
-function add_variable(name, type, initial_value)
+function add_variable(name, type, initial_value, settings)
 {
     // allowed types:
     //  - checkbox
     //  - number
     //  - text
-    //  - range (doesn't support min/max)
+    //  - range
+
+    if (window[name] != undefined)
+        return;
 
     window[name] = initial_value;
 
-    let [input, label] = create_input(name, type, initial_value, "variable-" + name, () => {
-        props = {
-            checkbox: "checked",
-            number: "valueAsNumber",
-            text: "value",
-        };
+    settings = settings || {};
+    settings.label = name;
 
-        window[name] = input[props[type]];
+    let [input, label] = create_input(type, initial_value, settings, "variable-" + name, (value) => {
+        console.log(value);
+        window[name] = value;
         dirty_functions();
     });
 
@@ -181,7 +183,7 @@ function parse_parameters(code)
 function create_code_editor(code, div, min_line_count, onChange)
 {
     let line_count = Math.min(min_line_count, code.split(/\r\n|\r|\n/).length);
-    div.style = `height: ${line_count*17 + 8}px`;
+    div.style = `margin-top: 5px; height: ${line_count*17 + 8}px`;
     div.className = "editor";
     div.innerHTML = code;
 
@@ -206,10 +208,46 @@ function add_model(code)
     let fn = eval("(" + code + ")");
     parameter = parse_parameters(code);
 
+    let target_input = null;
+    let refresh_targets = () => {
+        let settings = {
+            values: $settings.references,
+            dropdown: true,
+            width: "120px",
+            height: "29px",
+        };
+        let prev = target_input;
+        target_input = create_input("number", 0, settings, "target-" + fn.name, () => {
+        });
+        if (prev != null)
+            prev.replaceWith(target_input);
+    };
+
+    refresh_targets();
+
+    let button = document.createElement("button");
+    button.style = "height: 29px; padding-bottom: 0; padding-top: 0; margin-left: auto";
+    button.type = "button";
+    button.classList.add('btn', 'btn-primary');
+    button.innerText = "Fit";
+    button.onclick = () => {
+        button.innerText = "...";
+        let reference = $settings.references[target_input.value];
+        let interval_id = setInterval(training_step, 50, fn.name, reference, () => {
+            clearInterval(interval_id);
+            button.innerText = "Fit";
+        });
+    }
+
+    let controls = document.createElement("div");
+    controls.style = "display: flex; flex-direction: row; width: 100%";
+    controls.appendChild(target_input);
+    controls.appendChild(button);
+
     let editor = document.createElement("div");
     editor.id = "editor-" + fn.name;
 
-    add_list_element('#model_list', "", editor);
+    add_list_element('#model_list', "", controls, editor);
 
     create_code_editor(code, editor, 10, (new_code) => {
         if ($settings.plots[fn.name].display == false)
@@ -233,7 +271,7 @@ function add_model(code)
 
     let predict = (x) => fn(x, ...variables);
 
-    $settings.models[fn.name] = { variables, predict };
+    $settings.models[fn.name] = { error: Infinity, variables, predict, refresh_targets };
     $settings.plots[fn.name] = { data: null, display: true, predict, parameters };
 }
 
@@ -243,7 +281,7 @@ function add_reference(code, display)
     parameter = parse_parameters(code);
     generate_sliders(parameters);
 
-    let [input, label] = create_input("Display", "checkbox", display, "display-" + fn.name, () => {
+    let [input, label] = create_input("checkbox", display, {label: "Display"}, "display-" + fn.name, () => {
         $settings.plots[fn.name].display = input.checked;
         redraw_plots();
     });
@@ -267,6 +305,10 @@ function add_reference(code, display)
         $settings.plots[fn.name].data = null;
         redraw_plots();
     });
+
+    $settings.references.push(fn.name);
+    for (let model in $settings.models)
+        $settings.models[model].refresh_targets();
 
     $settings.plots[fn.name] = { func: fn, data: null, display, parameters };
     if (display)
@@ -342,7 +384,7 @@ function ensure_sliders()
                 html += `<option value='${j}' ${selected}>${slider.name}</option>`;
         }
         html += `</select>
-        <label for="slider-${i}" class="form-label" style="margin: 5px; width: 50px"></label>
+        <label for="slider-${i}" style="margin: 5px; width: 50px"></label>
         <input style='margin-top: 5px' type="range" class="form-range" id="slider-${i}" min="0" max="1" value="${$settings.sliders[i].value}" step="0.001" oninput="on_slider_change(${i})">
         </div>`;
     }
@@ -367,7 +409,7 @@ function update_slider(index)
 function on_slider_change(index)
 {
     let sliderDiv = document.querySelector('#sliders').children[index + 1]; // skip <br>
-    let value = truncate(parseFloat(sliderDiv.children[2].value), 3);
+    let value = truncate(sliderDiv.children[2].valueAsNumber, 3);
     sliderDiv.children[1].innerText = value;
     $settings.sliders[index].value = value;
     dirty_functions(false);
@@ -375,37 +417,115 @@ function on_slider_change(index)
 
 /// HTML
 
-function create_input(name, type, value, id, onChange)
+function create_input(type, value, settings, id, onChange)
 {
     classes = {
         checkbox: "form-check-input",
         number: "form-control",
+        range: "form-range",
         text: "form-control",
     };
 
-    let input = document.createElement("input");
-    input.className = classes[type];
-    input.onchange = onChange;
-    input.type = type;
-    input.id = id;
-
-    if (type == 'checkbox')
+    let input;
+    if (Array.isArray(settings.values))
     {
-        input.style = "margin-right: 5px";
-        input.checked = value;
+        if (settings.dropdown == true)
+        {
+            input = document.createElement("select");
+            input.className = "form-select";
+            let html = "";
+            for (let j = 0; j < settings.values.length; j++)
+                html += `<option value='${j}' ${j==value?"selected":""}>${settings.values[j]}</option>`;
+            input.innerHTML = html;
+            input.onchange = () => onChange(parseInt(input.value));
+        }
+        else
+        {
+            input = document.createElement("ul");
+            input.classList.add('nav', 'nav-pills', 'nav-fill');
+            let html = "";
+            for (let j = 0; j < settings.values.length; j++)
+                html += `<li class='nav-item'><a style="height: 26px; padding-bottom: 0; padding-top: 0" class='nav-link ${j==value?"active":""}'>${settings.values[j]}</a></li>`;
+            input.innerHTML = html;
+            for (let j = 0; j < settings.values.length; j++)
+            {
+                input.children[j].onclick = () => {
+                    input.children[value].children[0].classList.remove('active');
+                    input.children[j].children[0].classList.add('active');
+                    value = j;
+                    onChange(value);
+                }
+            }
+        }
     }
     else
     {
-        input.style = "height: 24px";
-        input.value = value;
+        input = document.createElement("input");
+        input.className = classes[type];
+        input.type = type;
     }
 
-    if (name == null)
+    input.id = id;
+    let width = settings.width || "100%";
+    let height = settings.height || "24px";
+
+    if (type == 'range')
+    {
+        input.value = value;
+        input.min = settings.min || 0;
+        input.max = settings.max || 1;
+        input.step = settings.step || 0.1;
+
+        let label = document.createElement("label");
+        label.style = "width: 50px";
+        label.innerText = value;
+        label.htmlFor = id;
+
+        let rangeInput = input;
+        input.onchange = null;
+        input.oninput = () => {
+            label.innerText = truncate(rangeInput.valueAsNumber, 3);
+
+        if (type == "range")
+            window[name] = input.children[1].valueAsNumber;
+        else
+            window[name] = input[props[type]];
+            onChange(rangeInput.valueAsNumber);
+        };
+
+        let div = document.createElement("div");
+        div.style = `width: ${width}; height: ${height}; display: flex; flex-direction: row`;
+        div.appendChild(label);
+        div.appendChild(input);
+        input = div;
+    }
+    else
+    {
+        if (type == 'checkbox')
+            input.style = "margin-right: 5px";
+        else
+            input.style = `width: ${width}; height: ${height}; padding-bottom: 0; padding-top: 0`;
+
+        if (!Array.isArray(settings.values))
+        {
+            let props = {
+                checkbox: "checked",
+                number: "valueAsNumber",
+                text: "value",
+            };
+            input[props[type]] = value;
+            input.onchange = () => {
+                onChange(input[props[type]]);
+            }
+        }
+    }
+
+    if (settings.label == undefined)
         return input;
 
     let label = document.createElement("label");
     label.htmlFor = id;
-    label.innerHTML = name;
+    label.innerHTML = settings.label;
 
     return [input, label];
 }

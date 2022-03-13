@@ -1,4 +1,5 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera>launcher.exe --allow-file-access-from-files
+
 var model_f = `function model_f(x, a, b, c)
 {
     let [NdotV, roughness] = x;
@@ -63,7 +64,7 @@ async function main()
 {
     await add_lut("FGD_64.png", "FGD");
     add_variable("TRANSFORM_FGD", "checkbox", false);
-    add_variable("FGD_LAYER", "number", 0);
+    add_variable("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
     add_model(model_f);
     add_reference(fgd_ref, true);
     add_reference(fgd_lazarov, false);
@@ -71,23 +72,16 @@ async function main()
 main()
 
 
-function loss(estimate, target)
-{
-}
-
 const learningRate = 0.1;
+const fitThreshold = 0.0001;
 const optimizer = tf.train.adam(learningRate);
 
-let intervalId;
-function fit_function()
+function training_step(model, ref, onFinish)
 {
-    intervalId = setInterval(training_step, 100);
-}
+    $settings.plots[model].data = null;
 
-function training_step()
-{
-    let model = $settings.models["model_f"];
-    let ref = $settings.plots["fgd_ref"];
+    model = $settings.models[model];
+    ref = $settings.plots[ref];
 
     var error = tf.tidy(() => {
 
@@ -121,20 +115,9 @@ function training_step()
         return optimizer.minimize(loss, true).dataSync();
     });
 
-    $settings.plots["model_f"].data = null;
     redraw_plots();
 
-    if (training_step.prev_error != null)
-    {
-        console.log(`error: ${error}  delta: ${Math.abs(training_step.prev_error - error)}   -- leak: ${tf.memory().numTensors}`);
-
-        if (Math.abs(training_step.prev_error - error) < 0.0001)
-        {
-            console.log("Stopping fitting");
-            clearInterval(intervalId);
-            training_step.prev_error = null;
-            return;
-        }
-    }
-    training_step.prev_error = error;
+    let fitted = Math.abs(model.error - error) < fitThreshold;
+    model.error = error;
+    if (fitted) onFinish();
 }
