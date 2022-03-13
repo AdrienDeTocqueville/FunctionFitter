@@ -3,10 +3,10 @@ $settings = {
     plots: {},
     models: {},
     references: [],
-    dimensions: 0,
-    graph_dimensions: 2,
+    parameter_names: [],
+    dimensions: undefined,
     parameters: null,
-    sliders: null,
+    sliders: [],
 };
 
 let shape_selector = document.querySelector("#shape-selector");
@@ -14,6 +14,7 @@ shape_selector.onchange = () => {
     $settings.graph_dimensions = parseInt(shape_selector.value);
     dirty_functions();
 }
+$settings.graph_dimensions = parseInt(shape_selector.value);
 
 let default_func = `function new_function(x, y)
 {
@@ -209,6 +210,8 @@ function add_model(code)
     parameter = parse_parameters(code);
 
     let target_input = null;
+    let params_input = null;
+
     let refresh_targets = () => {
         let settings = {
             values: $settings.references,
@@ -217,13 +220,29 @@ function add_model(code)
             height: "29px",
         };
         let prev = target_input;
-        target_input = create_input("number", 0, settings, "target-" + fn.name, () => {
-        });
+        target_input = create_input("number", 0, settings, "target-" + fn.name);
         if (prev != null)
             prev.replaceWith(target_input);
+
+        prev = params_input;
+        settings.values = $settings.parameter_names;
+        settings.multiple = true;
+        params_input = create_input("number", 0, settings, "target-" + fn.name);
+        if (prev != null)
+            prev.replaceWith(params_input);
     };
 
     refresh_targets();
+
+    let dataset, interval_id;
+    let stop_fitting = () => {
+        clearInterval(interval_id);
+        for (let i = 0; i < dataset.x.length; i++)
+            tf.dispose(dataset.x[i]);
+        tf.dispose(dataset.y);
+
+        button.innerText = "Fit";
+    }
 
     let button = document.createElement("button");
     button.style = "height: 29px; padding-bottom: 0; padding-top: 0; margin-left: auto";
@@ -231,17 +250,21 @@ function add_model(code)
     button.classList.add('btn', 'btn-primary');
     button.innerText = "Fit";
     button.onclick = () => {
+        if (button.innerText == "...")
+            return stop_fitting();
+
         button.innerText = "...";
-        let reference = $settings.references[target_input.value];
-        let interval_id = setInterval(training_step, 50, fn.name, reference, () => {
-            clearInterval(interval_id);
-            button.innerText = "Fit";
-        });
+
+        let ref = $settings.plots[$settings.references[target_input.value]].func;
+        dataset = generate_dataset(ref);
+
+        interval_id = setInterval(training_step, 50, fn.name, dataset, stop_fitting);
     }
 
     let controls = document.createElement("div");
     controls.style = "display: flex; flex-direction: row; width: 100%";
     controls.appendChild(target_input);
+    controls.appendChild(params_input);
     controls.appendChild(button);
 
     let editor = document.createElement("div");
@@ -253,21 +276,30 @@ function add_model(code)
         if ($settings.plots[fn.name].display == false)
             return;
 
-        let new_func;
+        let new_predict, args;
         try {
-            new_func = eval("(" + new_code + ")");
-        } catch (error) { return; } // Syntax error
+            let new_func = eval("(" + new_code + ")");
+            new_predict = (x) => new_func(x, ...variables);
+            args = [...new Array($settings.dimensions - 1)].map(() => tf.tensor(0));
+            new_predict(args);
+        }
+        catch (error) { // Syntax error
+            console.log(error);
+            if (args != null) args.forEach((arg) => tf.dispose(arg));
+            args = null;
+            return;
+        }
 
-        let predict = (x) => new_func(x, ...variables);
-        $settings.models[fn.name].predict = predict;
-        $settings.plots[fn.name].predict = predict;
+        console.log("model was recompiled");
+        $settings.models[fn.name].predict = new_predict;
+        $settings.plots[fn.name].predict = new_predict;
         $settings.plots[fn.name].data = null;
         redraw_plots();
     });
 
     let variables = [];
     for (let i = 1; i < parameters.length; i++)
-        variables.push( tf.variable(tf.scalar(Math.random())) );
+        variables.push( tf.variable(tf.scalar(0)) );
 
     let predict = (x) => fn(x, ...variables);
 
@@ -324,7 +356,10 @@ function generate_sliders(parameters)
         $settings.dimensions = parameters.length + 1;
         $settings.parameters = [];
         for (let i = 0; i < parameters.length; i++)
+        {
+            $settings.parameter_names.push(parameters[i]);
             $settings.parameters.push({ active: -1, value: 0, name: parameters[i], index: i});
+        }
     }
     else if ($settings.dimensions != parameters.length + 1)
     {
@@ -343,7 +378,10 @@ function generate_sliders(parameters)
                     found = true;
             }
             if (found == false)
-                $settings.parameters[i].name += ", " + parameters[i];
+            {
+                $settings.parameter_names[i] += ", " + parameters[i];
+                $settings.parameters[i].name = $settings.parameter_names[i];
+            }
         }
     }
 }
@@ -353,6 +391,10 @@ function ensure_sliders()
     if ($settings.dimensions < $settings.graph_dimensions)
         $settings.graph_dimensions = $settings.dimensions;
     let num_sliders = $settings.dimensions - $settings.graph_dimensions;
+
+    // Disable unndeed sliders
+    for (let i = num_sliders; i < $settings.sliders.length; i++)
+        $settings.sliders[i].active = -1;
 
     $settings.sliders = new Array(num_sliders);
     html = num_sliders != 0 ? "<br/>" : "";
@@ -391,8 +433,8 @@ function ensure_sliders()
     let sliders = document.querySelector('#sliders');
     sliders.innerHTML = html;
 
-    for (let i = 0; i < num_sliders; i++)
-        on_slider_change(i);
+    //for (let i = 0; i < num_sliders; i++)
+    //    on_slider_change(i);
 }
 
 function update_slider(index)
@@ -437,7 +479,7 @@ function create_input(type, value, settings, id, onChange)
             for (let j = 0; j < settings.values.length; j++)
                 html += `<option value='${j}' ${j==value?"selected":""}>${settings.values[j]}</option>`;
             input.innerHTML = html;
-            input.onchange = () => onChange(parseInt(input.value));
+            if (onChange) input.onchange = () => onChange(parseInt(input.value));
         }
         else
         {
@@ -453,7 +495,7 @@ function create_input(type, value, settings, id, onChange)
                     input.children[value].children[0].classList.remove('active');
                     input.children[j].children[0].classList.add('active');
                     value = j;
-                    onChange(value);
+                    if (onChange) onChange(value);
                 }
             }
         }
@@ -485,12 +527,7 @@ function create_input(type, value, settings, id, onChange)
         input.onchange = null;
         input.oninput = () => {
             label.innerText = truncate(rangeInput.valueAsNumber, 3);
-
-        if (type == "range")
-            window[name] = input.children[1].valueAsNumber;
-        else
-            window[name] = input[props[type]];
-            onChange(rangeInput.valueAsNumber);
+            if (onChange) onChange(rangeInput.valueAsNumber);
         };
 
         let div = document.createElement("div");
@@ -514,9 +551,8 @@ function create_input(type, value, settings, id, onChange)
                 text: "value",
             };
             input[props[type]] = value;
-            input.onchange = () => {
-                onChange(input[props[type]]);
-            }
+            if (onChange)
+                input.onchange = () => onChange(input[props[type]]);
         }
     }
 
@@ -541,6 +577,8 @@ function dirty_functions(rebuild_sliders=true)
 
 function redraw_plots(rebuild_sliders=true)
 {
+    if ($settings.dimensions == undefined)
+        return;
     if (rebuild_sliders)
         ensure_sliders();
 
@@ -563,91 +601,117 @@ function redraw_plots(rebuild_sliders=true)
     })
 }
 
+function generate_parameters()
+{
+    let resolution = 64;
+    let axis_1, axis_2;
+    let num_sliders = $settings.dimensions - $settings.graph_dimensions;
+
+    let inputs = new Array($settings.dimensions - 1);
+    for (let i = 0; i < inputs.length; i++)
+    {
+        let param = $settings.parameters[i];
+        if (param.active != -1)
+            inputs[i] = param.value;
+        else
+        {
+            inputs[i] = new Array(resolution);
+            for (let j = 0; j < resolution; j++)
+                inputs[i][j] = j / (resolution - 1);
+
+            if (axis_1 == undefined) axis_1 = i;
+            else if (axis_2 == undefined) axis_2 = i;
+        }
+    }
+
+    return [inputs, resolution, axis_1, axis_2];
+}
+
 function evaluate_func(plot)
 {
     let trace = null;
-    let resolution_x = 64;
-    let resolution_y = 64;
+    let [inputs, resolution, axis_x, axis_y] = generate_parameters();
 
     if ($settings.graph_dimensions == 2)
     {
         trace = {
-            x: new Array(resolution_x),
-            y: new Array(resolution_x),
-            type: "line"
+            type: "line",
+            x: inputs[axis_x],
+            y: new Array(resolution),
         };
-
-        let parameters = new Array($settings.dimensions - 1);
-        let num_sliders = $settings.dimensions - $settings.graph_dimensions;
-        for (let i = 0; i < num_sliders; i++)
-        {
-            let slider = $settings.sliders[i];
-            parameters[slider.index] = slider.value;
-        }
-        let remaining;
-        for (remaining = 0; remaining < parameters.length; remaining++)
-        {
-            if (parameters[remaining] == undefined)
-                break;
-        }
-
-        for (let i = 0; i < resolution_x; i++)
-            trace.x[i] = i / (resolution_x - 1);
-
-        if (plot.predict != null)
-        {
-            for (let i = 0; i < parameters.length; i++)
-            {
-                if (i != remaining)
-                    parameters[i] = tf.scalar(parameters[i]);
-            }
-
-            for (let i = 0; i < resolution_x; i++)
-            {
-                tf.tidy(() => {
-                    parameters[remaining] = tf.tensor(trace.x[i]);
-                    trace.y[i] = plot.predict(parameters).dataSync()[0];
-                });
-            }
-
-            for (let i = 0; i < parameters.length; i++)
-            {
-                if (i != remaining)
-                    tf.dispose(parameters[i]);
-            }
-        }
-        else
-        {
-            for (let i = 0; i < resolution_x; i++)
-            {
-                parameters[remaining] = trace.x[i];
-                trace.y[i] = plot.func(...parameters);
-            }
-        }
     }
     else if ($settings.graph_dimensions == 3)
     {
         trace = {
-            x: [],
-            y: [],
-            z: [],
-            type: "surface"
+            type: "surface",
+            x: inputs[axis_x],
+            y: inputs[axis_y],
+            z: new Array(resolution),
         };
+    }
 
-        for (let i = 0; i < resolution_x; i++)
-        {
-            let x = i / (resolution_x - 1);
-            trace.x.push(x);
-
-            let row = [];
-            for (let j = 0; j < resolution_y; j++)
+    let parameters = new Array(inputs.length);
+    if (plot.predict != null)
+    {
+        tf.tidy(() => {
+            let tmp_array = new Array(resolution);
+            for (let i = 0; i < parameters.length; i++)
             {
-                let y = j / (resolution_y - 1);
-                if (i == 0) trace.y.push(y);
-
-                row.push(plot.func(x, y));
+                if (!Array.isArray(inputs[i]))
+                {
+                    tmp_array.fill(inputs[i]);
+                    parameters[i] = tf.tensor(tmp_array);
+                }
             }
-            trace.z.push(row);
+
+            if ($settings.graph_dimensions == 2)
+            {
+                parameters[axis_x] = tf.tensor(inputs[axis_x]);
+                trace.y = plot.predict(parameters).dataSync();
+            }
+            else if ($settings.graph_dimensions == 3)
+            {
+                for (let i = 0; i < resolution; i++)
+                {
+                    tmp_array.fill(inputs[axis_x][i]);
+                    parameters[axis_x] = tf.tensor(tmp_array);
+                    parameters[axis_y] = tf.tensor(inputs[axis_y]);
+
+                    trace.z[i] = plot.predict(parameters).dataSync();
+                }
+            }
+        });
+    }
+    else
+    {
+        for (let i = 0; i < parameters.length; i++)
+        {
+            if (!Array.isArray(inputs[i]))
+                parameters[i] = inputs[i];
+        }
+
+        if ($settings.graph_dimensions == 2)
+        {
+            for (let i = 0; i < resolution; i++)
+            {
+                parameters[axis_x] = inputs[axis_x][i];
+                trace.y[i] = plot.func(...parameters);
+            }
+        }
+        else if ($settings.graph_dimensions == 3)
+        {
+            for (let i = 0; i < resolution; i++)
+            {
+                parameters[axis_x] = inputs[axis_x][i];
+
+                let row = new Array(resolution);
+                for (let j = 0; j < resolution; j++)
+                {
+                    parameters[axis_y] = inputs[axis_y][j];
+                    row[j] = plot.func(...parameters);
+                }
+                trace.z[i] = row;
+            }
         }
     }
 

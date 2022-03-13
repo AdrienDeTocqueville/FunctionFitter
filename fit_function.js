@@ -1,9 +1,11 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera>launcher.exe --allow-file-access-from-files
 
-var model_f = `function model_f(x, a, b, c)
+var model_f = `function model_f(x, a0, b0, c0, a1, b1, c1)
 {
     let [NdotV, roughness] = x;
-    return polynom(roughness, a, b, c);
+    let b = polynom(roughness, a0, b0, c0);
+    let d = polynom(roughness, a1, b1, c1);
+    return polynom(NdotV.add(-0.74), tf.scalar(0), b, tf.scalar(0), d);
 }`;
 var fgd_ref = `function fgd_ref(NdotV, roughness)
 {
@@ -45,6 +47,11 @@ function polynom(x)
     return res;
 }
 
+function random(min, max)
+{
+    return Math.random() * (max - min) + min;
+}
+
 function saturate(x)
 {
     return Math.max(0, Math.min(x, 1));
@@ -76,48 +83,114 @@ const learningRate = 0.1;
 const fitThreshold = 0.0001;
 const optimizer = tf.train.adam(learningRate);
 
-function training_step(model, ref, onFinish)
+function generate_dataset(ref)
+{
+    let [inputs, resolution, axis_x, axis_y] = generate_parameters();
+
+    if ($settings.graph_dimensions == 2)
+    {
+        return tf.tidy(() => {
+            let px = new Array(inputs.length);
+
+            let parameters = new Array(inputs.length);
+            let tmp_array = new Array(resolution);
+            for (let i = 0; i < px.length; i++)
+            {
+                if (!Array.isArray(inputs[i]))
+                {
+                    tmp_array.fill(inputs[i]);
+                    px[i] = tf.tensor(tmp_array);
+                    parameters[i] = inputs[i];
+                }
+                else
+                    px[i] = tf.tensor(inputs[i]);
+
+                px[i] = tf.keep(px[i]);
+            }
+
+            for (let i = 0; i < resolution; i++)
+            {
+                parameters[axis_x] = inputs[axis_x][i];
+                tmp_array[i] = ref(...parameters);
+            }
+            let py = tf.keep(tf.tensor(tmp_array));
+
+            return { x: px, y: py };
+        });
+    }
+    else
+    {
+        return tf.tidy(() => {
+            let px = new Array(inputs.length);
+
+            let parameters = new Array(inputs.length);
+            let tmp_array = new Array(resolution*resolution);
+            for (let i = 0; i < px.length; i++)
+            {
+                if (!Array.isArray(inputs[i]))
+                {
+                    tmp_array.fill(inputs[i]);
+                    parameters[i] = inputs[i];
+                }
+                else if (i == axis_x)
+                {
+                    for (let j = 0; j < resolution; j++)
+                    {
+                        for (let k = 0; k < resolution; k++)
+                            tmp_array[j*resolution+k] = inputs[i][k];
+                    }
+                }
+                else if (i == axis_y)
+                {
+                    for (let j = 0; j < resolution; j++)
+                    {
+                        for (let k = 0; k < resolution; k++)
+                            tmp_array[j*resolution+k] = inputs[i][j];
+                    }
+                }
+
+                px[i] = tf.keep(tf.tensor(tmp_array));
+            }
+
+            for (let i = 0; i < resolution; i++)
+            {
+                parameters[axis_x] = inputs[axis_x][i];
+                for (let j = 0; j < resolution; j++)
+                {
+                    parameters[axis_y] = inputs[axis_y][j];
+                    tmp_array[i*resolution+j] = ref(...parameters);
+                }
+            }
+            let py = tf.keep(tf.tensor(tmp_array));
+
+            return { x: px, y: py };
+        });
+    }
+}
+
+function training_step(model, dataset, onFinish)
 {
     $settings.plots[model].data = null;
-
     model = $settings.models[model];
-    ref = $settings.plots[ref];
 
     var error = tf.tidy(() => {
 
-        let tmp_array = new Array(ref.data.x.length);
-
-        let px = new Array($settings.dimensions - 1);
-        let py = tf.tensor(ref.data.y);
-
-        let parameters = new Array($settings.dimensions - 1);
-        let num_sliders = $settings.dimensions - $settings.graph_dimensions;
-        for (let i = 0; i < px.length; i++)
-        {
-            let param = $settings.parameters[i];
-            if (param.active == -1)
-                px[i] = tf.tensor(ref.data.x);
-            else
-            {
-                tmp_array.fill(param.value);
-                px[i] = tf.tensor(tmp_array);
-            }
-        }
-
         let loss = () => {
-            let ppx = model.predict(px);
-            return ppx.sub(py).square().mean();
+            let ppx = model.predict(dataset.x);
+            return ppx.sub(dataset.y).square().mean();
         }
 
-        for (let i = 0; i < 100; i++)
-            optimizer.minimize(loss, false);
+        //for (let i = 0; i < 100; i++)
+        //    optimizer.minimize(loss, false);
 
         return optimizer.minimize(loss, true).dataSync();
     });
 
     redraw_plots();
 
-    let fitted = Math.abs(model.error - error) < fitThreshold;
+    //console.log(tf.memory().numTensors);
+    let fitted = error < 0.001 && Math.abs(model.error - error) < fitThreshold;
+    //fitted = true;
     model.error = error;
     if (fitted) onFinish();
 }
