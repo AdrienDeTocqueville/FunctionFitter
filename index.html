@@ -47,6 +47,10 @@
         .pannel {
             padding: 10px
         }
+        .pannel>ul {
+            padding-right: 20px;
+            padding-left: 10px;
+        }
 
         .gutter {
             border: 0;
@@ -78,9 +82,13 @@
 
     <main style="display: flex; flex-direction: row">
 
-        <div class="pannel" id="sliders">
+        <div class="pannel" id="controls">
             <h3>Sliders</h3>
-            <div style="display: flex; flex-direction: column; padding-top: 8px"></div>
+            <div id="sliders" style="display: flex; flex-direction: column; padding-top: 8px"></div>
+
+            <hr/>
+            <h3>Variables</h3>
+			<ul id="variable_list"> </ul>
         </div>
 
         <div class="pannel" id="plots" style="">
@@ -105,25 +113,25 @@
 			<h3>LUTs
 				<button type="button" class="btn btn-outline-secondary add-button" id="add_lut">+</button>
 			</h3>
-			<ul id="lut_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+			<ul id="lut_list"> </ul>
 
             <hr/>
-            <h3>Variables
+            <h3>Settings
                 <button type="button" class="btn btn-outline-secondary add-button" id="add_var">+</button>
             </h3>
-            <ul id="variable_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+            <ul id="settings_list"> </ul>
 
             <hr/>
             <h3>Models
                 <button type="button" class="btn btn-outline-secondary add-button" id="add_model">+</button>
             </h3>
-            <ul id="model_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+            <ul id="model_list"> </ul>
 
             <hr/>
             <h3>References
                 <button type="button" class="btn btn-outline-secondary add-button" id="add_ref">+</button>
             </h3>
-			<ul id="reference_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+			<ul id="reference_list"> </ul>
 		</div>
 
 

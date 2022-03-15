@@ -1,4 +1,4 @@
-// C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera>launcher.exe --allow-file-access-from-files
+// C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera\launcher.exe --allow-file-access-from-files
 
 function model_f(x, a0, b0, c0, a1, b1, c1)
 {
@@ -82,11 +82,11 @@ function truncate(x, precision=2)
 async function main()
 {
     await add_lut("FGD_64.png", "FGD");
-    add_variable("TRANSFORM_FGD", "checkbox", true);
-    add_variable("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
-    add_model(model_f);
+    add_setting("TRANSFORM_FGD", "checkbox", true);
+    add_setting("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
     add_reference(fgd_ref, true);
     add_reference(fgd_lazarov, false);
+    add_model(model_f);
 }
 main()
 
@@ -123,7 +123,7 @@ function generate_dataset(ref)
             for (let i = 0; i < resolution; i++)
             {
                 parameters[axis_x] = inputs[axis_x][i];
-                tmp_array[i] = ref(...parameters);
+                tmp_array[i] = ref.func(...parameters);
             }
             let py = tf.keep(tf.tensor(tmp_array));
 
@@ -170,7 +170,7 @@ function generate_dataset(ref)
                 for (let j = 0; j < resolution; j++)
                 {
                     parameters[axis_y] = inputs[axis_y][j];
-                    tmp_array[i*resolution+j] = ref(...parameters);
+                    tmp_array[i*resolution+j] = ref.func(...parameters);
                 }
             }
             let py = tf.keep(tf.tensor(tmp_array));
@@ -180,26 +180,36 @@ function generate_dataset(ref)
     }
 }
 
+function mse_loss(func, dataset)
+{
+    let error = func(dataset.x).sub(dataset.y);
+    return error.square().mean();
+}
+
+function compute_mse(func, dataset)
+{
+    return dataset == null ? Infinity : tf.tidy(() => mse_loss(func, dataset).dataSync()[0]);
+}
+
 function training_step(model_name, dataset, onFinish)
 {
     model = $settings.models[model_name];
 
     var error = tf.tidy(() => {
 
-        let loss = () => {
-            let ppx = model.predict(dataset.x);
-            return ppx.sub(dataset.y).square().mean();
-        }
+        let loss = () => mse_loss(model.predict, dataset);
 
         for (let i = 0; i < 100; i++)
             optimizer.minimize(loss, false);
 
-        return optimizer.minimize(loss, true).dataSync();
+        return optimizer.minimize(loss, true).dataSync()[0];
     });
 
-    refresh_plot(model_name);
+    for (let variable of model.variables)
+        refresh_variable(variable);
 
     let fitted = error < 0.001 && Math.abs(model.error - error) < fitThreshold;
-    model.error = error;
+    model.refresh_mse(error);
+    refresh_plot(model_name);
     if (fitted) onFinish();
 }

@@ -6,18 +6,20 @@ $settings = {
     parameter_names: [],
     dimensions: undefined,
     parameters: null,
+    variables: {},
     sliders: [],
-    sliderElement: document.querySelector('#sliders>div'),
+    sliderElement: document.querySelector('#sliders'),
 };
 
 let shape_selector = document.querySelector("#shape-selector");
 shape_selector.onchange = () => {
     $settings.graph_dimensions = parseInt(shape_selector.value);
+    ensure_sliders();
     refresh_all_plots();
 }
 $settings.graph_dimensions = parseInt(shape_selector.value);
 
-Split(["#sliders", "#plots", "#settings"], {sizes: [20, 40, 40]});
+Split(["#controls", "#plots", "#settings"], {sizes: [20, 40, 40]});
 
 let default_func = `function new_function(x, y)
 {
@@ -28,22 +30,24 @@ hook_add_buttons();
 
 /// LISTS
 
-function add_list_element(list, style, onDelete)
+function add_list_element(list, style, children, on_delete)
 {
     let li = document.createElement("li");
     li.className = "deletable-list list-group-item";
     li.style = style;
 
-    for (let i = 2; i < arguments.length; i++)
-        li.appendChild(arguments[i]);
+    for (let child of children)
+        li.appendChild(child);
 
-    //<button type="button" class="btn-close" aria-label="Close"></button>
-    let delete_button = document.createElement("button");
-    delete_button.className = "btn-close";
-    delete_button.type = "button";
-    delete_button.onclick = onDelete;
+    if (on_delete != null)
+    {
+        let delete_button = document.createElement("button");
+        delete_button.className = "btn-close";
+        delete_button.type = "button";
+        delete_button.onclick = on_delete;
 
-    li.appendChild(delete_button);
+        li.appendChild(delete_button);
+    }
 
     document.querySelector(list).appendChild(li);
 }
@@ -142,14 +146,14 @@ function add_lut(url, name)
     div2.appendChild(input);
     div2.appendChild(div);
 
-    add_list_element('#lut_list', "display: flex; flex-direction: row", canvas, div2);
+    add_list_element('#lut_list', "display: flex; flex-direction: row", [canvas, div2]);
 
     return url != null ? load_lut_async(url, name, canvas) : null;
 }
 
-/// VARIABLES
+/// SETTINGS
 
-function add_variable(name, type, initial_value, settings)
+function add_setting(name, type, initial_value, settings)
 {
     // allowed types:
     //  - checkbox
@@ -165,14 +169,14 @@ function add_variable(name, type, initial_value, settings)
     settings = settings || {};
     settings.label = name;
 
-    let [input, label] = create_input(type, initial_value, settings, "variable-" + name, (value) => {
+    let [input, label] = create_input(type, initial_value, settings, "settings-" + name, (value) => {
         window[name] = value;
         refresh_all_plots();
     });
 
     label.style = "margin-right: 30px";
 
-    add_list_element('#variable_list', "display: flex; flex-direction: row", label, input);
+    add_list_element('#settings_list', "display: flex; flex-direction: row", [label, input]);
 }
 
 
@@ -224,33 +228,65 @@ function add_model(code)
 
     let parameters = parse_parameters(code);
 
+    let variables = new Array(parameters.length - 1);
+    for (let i = 0; i < variables.length; i++)
+    {
+        let name = parameters[i+1];
+       variables[i] = get_or_create_variable(name, Math.random());
+    }
+
+    let predict = (x) => fn(x, ...variables);
+
+    $settings.models[fn.name] = { error: Infinity, ref: $settings.references[0], variables, predict };
+    $settings.plots[fn.name] = { data: null, display: true, predict, parameters };
+
+    // Create UI
     let target_input = null;
     let params_input = null;
+    let mse_label = null;
 
-    let refresh_targets = () => {
+    let replace_elem = (previous_value, new_value) => {
+        if (previous_value != null) previous_value.replaceWith(new_value);
+        return new_value;
+    }
+
+    $settings.models[fn.name].refresh_targets = () => {
+        if ($settings.models[fn.name].ref == undefined)
+            $settings.models[fn.name].ref = $settings.references[0];
+        let ref = $settings.models[fn.name].ref;
+        let ref_index = $settings.references.indexOf(ref);
+
         let settings = {
             values: $settings.references,
             dropdown: true,
             width: "120px",
         };
-        let prev = target_input;
-        target_input = create_input("number", 0, settings, "target-" + fn.name);
-        if (prev != null)
-            prev.replaceWith(target_input);
+        target_input = replace_elem(target_input, create_input("number", ref_index, settings, "target-" + fn.name, (new_index) => {
+            $settings.models[fn.name].ref = settings.values[new_index];
+        }));
 
         /*
-        prev = params_input;
         settings.values = $settings.parameter_names;
         settings.multiple = true;
-        params_input = create_input("number", 0, settings, "target-" + fn.name);
-        if (prev != null)
-            prev.replaceWith(params_input);
+        params_input = replace_elem(params_input, create_input("number", 0, settings, "target-" + fn.name));
         */
     };
 
-    refresh_targets();
+    $settings.models[fn.name].refresh_mse = (mse) => {
+        let ref = $settings.models[fn.name].ref;
+        mse = mse || compute_mse(predict, get_dataset(ref));
+        $settings.models[fn.name].error = mse;
 
-    let dataset, interval_id;
+        let new_label = document.createElement("div");
+        new_label.style = "padding: 2px; margin-left: 20px";
+        new_label.innerText = "MSE: " + truncate(mse, 5);
+        mse_label = replace_elem(mse_label, new_label);
+    };
+
+    $settings.models[fn.name].refresh_targets();
+    $settings.models[fn.name].refresh_mse();
+
+    let interval_id;
     let stop_fitting = () => {
         clearInterval(interval_id);
 
@@ -258,10 +294,6 @@ function add_model(code)
         for (let i = 0; i < variables.length; i++)
             param_str += `const float ${parameters[i+1]} = ${variables[i].dataSync()[0]};\n`;
         console.log(param_str);
-
-        for (let i = 0; i < dataset.x.length; i++)
-            tf.dispose(dataset.x[i]);
-        tf.dispose(dataset.y);
 
         button.innerText = "Fit";
     }
@@ -277,55 +309,89 @@ function add_model(code)
 
         button.innerText = "...";
 
-        let ref = $settings.plots[$settings.references[target_input.value]].func;
-        dataset = generate_dataset(ref);
-
-        interval_id = setInterval(training_step, 50, fn.name, dataset, stop_fitting);
+        let ref = $settings.references[target_input.value];
+        interval_id = setInterval(training_step, 50, fn.name, get_dataset(ref), stop_fitting);
     }
 
     let controls = document.createElement("div");
     controls.style = "display: flex; flex-direction: row; width: 100%";
     controls.appendChild(target_input);
-    //controls.appendChild(params_input);
+    controls.appendChild(mse_label);
     controls.appendChild(button);
 
     let editor = document.createElement("div");
     editor.id = "editor-" + fn.name;
 
-    add_list_element('#model_list', "", controls, editor);
+    add_list_element('#model_list', "", [controls, editor]);
 
     create_code_editor(code, editor, 10, (new_code) => {
         if ($settings.plots[fn.name].display == false)
             return;
 
-        let new_predict, args;
-        try {
-            let new_func = eval("(" + new_code + ")");
-            new_predict = (x) => new_func(x, ...variables);
-            args = [...new Array($settings.dimensions - 1)].map(() => tf.tensor(0));
-            new_predict(args);
-        }
-        catch (error) { // Syntax error
-            console.log(error);
-            if (args != null) args.forEach((arg) => tf.dispose(arg));
-            args = null;
+        let validate_model = () => {
+            try {
+                let new_func = eval("(" + new_code + ")");
+                let new_predict = (x) => new_func(x, ...variables);
+                new_predict([...new Array($settings.dimensions - 1)].fill(tf.scalar(0)));
+                return new_predict;
+            }
+            catch (error) { console.log(error); } // Syntax error
+        };
+
+        let new_predict = tf.tidy(validate_model);
+        if (new_predict == undefined)
             return;
-        }
 
         console.log("model was recompiled");
         $settings.models[fn.name].predict = new_predict;
         $settings.plots[fn.name].predict = new_predict;
         refresh_plot(fn.name);
     });
+}
 
-    let variables = new Array(parameters.length - 1);
-    for (let i = 0; i < variables.length; i++)
-        variables[i] = tf.variable(tf.scalar(Math.random()));
+function get_or_create_variable(name, value)
+{
+    if ($settings.variables[name] == null)
+    {
+        let settings = { label: name, step: 0.00001 }
+        let [input, label] = create_input("number", truncate(value, 5), settings, "variable-" + name, (value) => {
+            let tensor = $settings.variables[name].tensor;
+            tf.tidy(() => tensor.assign(tf.scalar(value)));
 
-    let predict = (x) => fn(x, ...variables);
+            for (let name in $settings.models)
+            {
+                for (let variable of $settings.models[name].variables)
+                {
+                    if (variable === tensor)
+                    {
+                        refresh_plot(name);
+                        $settings.models[name].refresh_mse();
+                        break;
+                    }
+                }
+            }
+        });
 
-    $settings.models[fn.name] = { error: Infinity, variables, predict, refresh_targets };
-    $settings.plots[fn.name] = { data: null, display: true, predict, parameters };
+        label.style = "margin-right: 10px";
+        add_list_element('#variable_list', "display: flex; flex-direction: row", [label, input]);
+
+        value = tf.scalar(value);
+        $settings.variables[name] = { tensor: tf.variable(value), input };
+        tf.dispose(value);
+    }
+    return $settings.variables[name].tensor;
+}
+
+function refresh_variable(tensor)
+{
+    for (let name in $settings.variables)
+    {
+        if ($settings.variables[name].tensor === tensor)
+        {
+            $settings.variables[name].input.valueAsNumber = truncate(tensor.dataSync()[0], 5);
+            return;
+        }
+    }
 }
 
 function validate_reference(code)
@@ -364,7 +430,7 @@ function add_reference(code, display)
     let editor = document.createElement("div");
     editor.id = "editor-" + fn.name;
 
-    add_list_element('#reference_list', "", input, label, editor);
+    add_list_element('#reference_list', "", [input, label, editor]);
 
     create_code_editor(code, editor, 10, (new_code) => {
         if ($settings.plots[fn.name].display == false)
@@ -382,9 +448,9 @@ function add_reference(code, display)
     for (let model in $settings.models)
         $settings.models[model].refresh_targets();
 
-    $settings.plots[fn.name] = { func: fn, data: null, display, parameters };
-    if (display)
-        draw_plots();
+
+    $settings.plots[fn.name] = { func: fn, data: null, dataset: null, display, parameters };
+    refresh_plot(fn.name);
 }
 
 /// SLIDERS
@@ -424,10 +490,14 @@ function generate_sliders(parameters)
             }
         }
     }
+
+    ensure_sliders();
 }
 
 function ensure_sliders()
 {
+    if ($settings.dimensions == undefined)
+        return;
     if ($settings.dimensions < $settings.graph_dimensions)
         $settings.graph_dimensions = $settings.dimensions;
     let num_sliders = $settings.dimensions - $settings.graph_dimensions;
@@ -490,8 +560,7 @@ function ensure_sliders()
         value_label.style = "padding: 2px";
         value_label.innerText = value;
 
-        div.append(dropdown);
-        div.append(value_label);
+        div.append(dropdown, value_label);
         $settings.sliderElement.append(div);
 
         let slider = document.createElement("input");
@@ -507,7 +576,7 @@ function ensure_sliders()
             value = truncate(slider.valueAsNumber, 3);
             value_label.innerText = value;
             $settings.sliders[index].value = value;
-            refresh_all_plots(false);
+            refresh_all_plots();
         }
 
         $settings.sliderElement.append(slider);
@@ -565,6 +634,7 @@ function create_input(type, value, settings, id, onChange)
     }
 
     input.id = id;
+    input.step = settings.step;
     let width = settings.width || "100%";
 
     if (type == 'range')
@@ -572,7 +642,6 @@ function create_input(type, value, settings, id, onChange)
         input.value = value;
         input.min = settings.min || 0;
         input.max = settings.max || 1;
-        input.step = settings.step || 0.1;
 
         let label = document.createElement("label");
         label.style = "width: 50px";
@@ -624,25 +693,54 @@ function create_input(type, value, settings, id, onChange)
 
 /// PLOT
 
-function refresh_plot(name, rebuild_sliders=true)
+function get_dataset(name)
 {
-    $settings.plots[name].data = null;
-    draw_plots(rebuild_sliders);
+    let plot = $settings.plots[name];
+    if (plot == null)
+        return null;
+    if (plot.dataset == null)
+        plot.dataset = generate_dataset(plot);
+    return plot.dataset;
 }
 
-function refresh_all_plots(rebuild_sliders=true)
+function _dirty_plot(name)
+{
+    let plot = $settings.plots[name];
+    plot.data = null;
+    if (plot.dataset != null)
+    {
+        for (let i = 0; i < plot.dataset.x.length; i++)
+            tf.dispose(plot.dataset.x[i]);
+        tf.dispose(plot.dataset.y);
+        plot.dataset = null;
+    }
+    if (plot.predict == null)
+    {
+        for (let model in $settings.models)
+        {
+            if ($settings.models[model].ref == name)
+                $settings.models[model].refresh_mse();
+        }
+    }
+}
+
+function refresh_plot(name)
+{
+    _dirty_plot(name);
+    draw_plots();
+}
+
+function refresh_all_plots()
 {
     for (let name in $settings.plots)
-        $settings.plots[name].data = null;
-    draw_plots(rebuild_sliders);
+        _dirty_plot(name);
+    draw_plots();
 }
 
-function draw_plots(rebuild_sliders=true)
+function draw_plots()
 {
     if ($settings.dimensions == undefined)
         return;
-    if (rebuild_sliders)
-        ensure_sliders();
 
     traces = [];
     for (let name in $settings.plots)
@@ -666,7 +764,7 @@ function draw_plots(rebuild_sliders=true)
 
 function generate_parameters()
 {
-    let resolution = 64;
+    let resolution = 4;
     let axis_1, axis_2;
     let num_sliders = $settings.dimensions - $settings.graph_dimensions;
 
