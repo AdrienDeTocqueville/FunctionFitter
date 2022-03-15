@@ -568,10 +568,10 @@ function ensure_sliders()
         slider.className = "form-range";
         slider.type = "range";
         slider.id = "slider-" + i;
-        slider.value = value;
         slider.min = 0;
         slider.max = 1;
         slider.step = 0.001;
+        slider.value = value;
         slider.oninput = () => {
             value = truncate(slider.valueAsNumber, 3);
             value_label.innerText = value;
@@ -764,7 +764,7 @@ function draw_plots()
 
 function generate_parameters()
 {
-    let resolution = 4;
+    let resolution = 64;
     let axis_1, axis_2;
     let num_sliders = $settings.dimensions - $settings.graph_dimensions;
 
