@@ -8,6 +8,19 @@
 	<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.0.0/dist/tf.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js" integrity="sha512-6ts6Fu561/yzWvD6uwQp3XVYwiWNpWnZ0hdeQrETqtnQiGjTfOS06W76aUDnq51hl1SxXtJaqy7IsZ3oP/uZEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 	<style>
+        body > header {
+            height: 3em;
+            color: white;
+
+            background-color: #24292E;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            box-shadow: 0 1px 6px 0 rgba(0,0,0,0.4);
+        }
+
 		hr {
 		  margin-top: 1rem;
 		  margin-bottom: 1rem;
@@ -27,55 +40,98 @@
 				padding-top: 0;
 				padding-left: 8px;
 		}
+
+        .pannel {
+            padding: 10px
+        }
+
+        .gutter {
+            border: 0;
+            border-right: 1px solid grey;
+            opacity: .5;
+        }
+        .gutter:hover {
+            cursor: ew-resize;
+        }
+
+        .deletable-list .btn-close {
+            position: absolute;
+            right: -4px;
+            top: -4px;
+            width: 4px;
+            height: 4px;
+            display: none;
+        }
+        .deletable-list:hover .btn-close {
+            display: block;
+        }
 	</style>
 </head>
 
 <body>
+	<header>
+		<div id="logo">
+			<a><strong>Function Fitter</strong></a>
+		</div>
+	</header>
+
 	<main style="display: flex; flex-direction: row">
-		<div style="flex: 3">
+
+        <div class="pannel" id="sliders">
+            <h3>Sliders</h3>
+            <div style="display: flex; flex-direction: column; padding-top: 8px"></div>
+        </div>
+
+		<div class="pannel" id="plots" style="">
+
+            <br/>
+            <div style="display: flex; flex-direction: row; justify-content: space-around; padding-bottom: 4px;">
+                <select class="form-select form-select-sm" id="shape-selector" style="width: 200px">
+                    <option value="2" selected>2D Graph</option>
+                    <option value="3">3D Surface</option>
+                </select>
+                <div style="display: flex">
+                    <label style="margin-right: 10px; font-size: 19px" for="resolution">Resolution</label>
+                    <input style="width: 200px" class="form-control form-control-sm" id="resolution" type="number" min="0" value="64"/>
+                </div>
+            </div>
 
 			<div id="plot"></div>
 
-			<select class="form-select" id="shape-selector">
-				<option value="2">2D Graph</option>
-				<option value="3" selected>3D Surface</option>
-			</select>
-
-			<div id="sliders" style="display: flex; flex-direction: column"></div>
-
 		</div>
 
-		<div style="flex: 2; padding: 10px">
+		<div class="pannel" id="settings">
 			<h3>LUTs
 				<button type="button" class="btn btn-outline-secondary add-button" id="add_lut">+</button>
 			</h3>
 			<ul id="lut_list" style="padding-right: 20px; padding-left: 10px"> </ul>
 
-   		<hr/>
-			<h3>Variables
-				<button type="button" class="btn btn-outline-secondary add-button" id="add_var">+</button>
-			</h3>
-			<ul id="variable_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+            <hr/>
+            <h3>Variables
+                <button type="button" class="btn btn-outline-secondary add-button" id="add_var">+</button>
+            </h3>
+            <ul id="variable_list" style="padding-right: 20px; padding-left: 10px"> </ul>
 
-   		<hr/>
-			<h3>Models
-				<button type="button" class="btn btn-outline-secondary add-button" id="add_model">+</button>
-			</h3>
-			<ul id="model_list" style="padding-right: 20px; padding-left: 10px"> </ul>
+            <hr/>
+            <h3>Models
+                <button type="button" class="btn btn-outline-secondary add-button" id="add_model">+</button>
+            </h3>
+            <ul id="model_list" style="padding-right: 20px; padding-left: 10px"> </ul>
 
-   		<hr/>
-			<h3>References
-				<button type="button" class="btn btn-outline-secondary add-button" id="add_ref">+</button>
-			</h3>
+            <hr/>
+            <h3>References
+                <button type="button" class="btn btn-outline-secondary add-button" id="add_ref">+</button>
+            </h3>
 			<ul id="reference_list" style="padding-right: 20px; padding-left: 10px"> </ul>
 		</div>
 
 
 	</main>
 
+    <script src="split.js"></script>
+
 	<script src="layout_utils.js" defer></script>
 	<script src="fit_function.js" defer></script>
-
 </body>
 
 </html>

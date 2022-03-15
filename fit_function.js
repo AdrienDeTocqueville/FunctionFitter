@@ -1,17 +1,29 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera>launcher.exe --allow-file-access-from-files
 
-var model_f = `function model_f(x, a0, b0, c0, a1, b1, c1)
+function model_f(x, a0, b0, c0, a1, b1, c1)
 {
     let [NdotV, roughness] = x;
     let b = polynom(roughness, a0, b0, c0);
     let d = polynom(roughness, a1, b1, c1);
     return polynom(NdotV.add(-0.74), tf.scalar(0), b, tf.scalar(0), d);
-}`;
-var fgd_ref = `function fgd_ref(NdotV, roughness)
+}
+function fgd_ref(NdotV, roughness)
 {
+    if (TRANSFORM_FGD)
+    {
+        if (FGD_LAYER == 0)
+        {
+            if (roughness < 0.02 && NdotV <= 0.6)
+                return fgd_lazarov(NdotV, roughness);
+            if (NdotV > 0.6)
+                return 2*fgd_ref(0.6, roughness) - fgd_ref(0.6-(NdotV-0.6), roughness);
+        }
+        if (FGD_LAYER == 1 && roughness < 0.4 && NdotV < 0.07)
+            return 1;
+    }
     return sample_lut("FGD", Math.sqrt(NdotV), 1 - roughness, FGD_LAYER);
-}`;
-var fgd_lazarov = `function fgd_lazarov(NdotV, roughness)
+}
+function fgd_lazarov(NdotV, roughness)
 {
     let x = (1-roughness)*(1-roughness);
     let y = NdotV;
@@ -33,7 +45,7 @@ var fgd_lazarov = `function fgd_lazarov(NdotV, roughness)
     let d6 = 2.661;
     let delta = saturate( d0 + d1 * x + d2 * y + d3 * x * x + d4 * x * y + d5 * y * y + d6 * x * x * x );
     return [bias, delta, 1][FGD_LAYER];
-}`;
+}
 
 function polynom(x)
 {
@@ -70,7 +82,7 @@ function truncate(x, precision=2)
 async function main()
 {
     await add_lut("FGD_64.png", "FGD");
-    add_variable("TRANSFORM_FGD", "checkbox", false);
+    add_variable("TRANSFORM_FGD", "checkbox", true);
     add_variable("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
     add_model(model_f);
     add_reference(fgd_ref, true);
@@ -168,10 +180,9 @@ function generate_dataset(ref)
     }
 }
 
-function training_step(model, dataset, onFinish)
+function training_step(model_name, dataset, onFinish)
 {
-    $settings.plots[model].data = null;
-    model = $settings.models[model];
+    model = $settings.models[model_name];
 
     var error = tf.tidy(() => {
 
@@ -180,17 +191,15 @@ function training_step(model, dataset, onFinish)
             return ppx.sub(dataset.y).square().mean();
         }
 
-        //for (let i = 0; i < 100; i++)
-        //    optimizer.minimize(loss, false);
+        for (let i = 0; i < 100; i++)
+            optimizer.minimize(loss, false);
 
         return optimizer.minimize(loss, true).dataSync();
     });
 
-    redraw_plots();
+    refresh_plot(model_name);
 
-    //console.log(tf.memory().numTensors);
     let fitted = error < 0.001 && Math.abs(model.error - error) < fitThreshold;
-    //fitted = true;
     model.error = error;
     if (fitted) onFinish();
 }

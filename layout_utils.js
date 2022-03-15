@@ -7,14 +7,17 @@ $settings = {
     dimensions: undefined,
     parameters: null,
     sliders: [],
+    sliderElement: document.querySelector('#sliders>div'),
 };
 
 let shape_selector = document.querySelector("#shape-selector");
 shape_selector.onchange = () => {
     $settings.graph_dimensions = parseInt(shape_selector.value);
-    dirty_functions();
+    refresh_all_plots();
 }
 $settings.graph_dimensions = parseInt(shape_selector.value);
+
+Split(["#sliders", "#plots", "#settings"], {sizes: [20, 40, 40]});
 
 let default_func = `function new_function(x, y)
 {
@@ -25,14 +28,22 @@ hook_add_buttons();
 
 /// LISTS
 
-function add_list_element(list, style)
+function add_list_element(list, style, onDelete)
 {
     let li = document.createElement("li");
-    li.className = "list-group-item";
+    li.className = "deletable-list list-group-item";
     li.style = style;
 
     for (let i = 2; i < arguments.length; i++)
         li.appendChild(arguments[i]);
+
+    //<button type="button" class="btn-close" aria-label="Close"></button>
+    let delete_button = document.createElement("button");
+    delete_button.className = "btn-close";
+    delete_button.type = "button";
+    delete_button.onclick = onDelete;
+
+    li.appendChild(delete_button);
 
     document.querySelector(list).appendChild(li);
 }
@@ -69,7 +80,7 @@ function load_lut_async(url, name, canvas)
             $settings.LUTs[name] = data;
 
             if (shouldReload)
-                dirty_functions();
+                refresh_all_plots();
             resolve(data);
         };
         img.onerror = reject;
@@ -114,12 +125,12 @@ function add_lut(url, name)
         $settings.LUTs[name] = null;
         name = input.value;
         $settings.LUTs[name] = lut;
-        dirty_functions();
+        refresh_all_plots();
     };
 
     let [box, label] = create_input("checkbox", true, {label: "Bilinear Filtering"}, "bilinear-" + name, () => {
         $settings.LUTs[name].bilinear = box.checked;
-        dirty_functions();
+        refresh_all_plots();
     });
 
     let div = document.createElement("div");
@@ -155,9 +166,8 @@ function add_variable(name, type, initial_value, settings)
     settings.label = name;
 
     let [input, label] = create_input(type, initial_value, settings, "variable-" + name, (value) => {
-        console.log(value);
         window[name] = value;
-        dirty_functions();
+        refresh_all_plots();
     });
 
     label.style = "margin-right: 30px";
@@ -175,7 +185,7 @@ function parse_parameters(code)
     let FN_ARG_SPLIT = /,/;
     fnText = code.replace(STRIP_COMMENTS, '');
     argDecl = fnText.match(FN_ARGS);
-    parameters = argDecl[1].split(FN_ARG_SPLIT);
+    let parameters = argDecl[1].split(FN_ARG_SPLIT);
     for (let i = 0; i < parameters.length; i++)
         parameters[i] = parameters[i].trim();
     return parameters;
@@ -206,8 +216,13 @@ function create_code_editor(code, div, min_line_count, onChange)
 
 function add_model(code)
 {
-    let fn = eval("(" + code + ")");
-    parameter = parse_parameters(code);
+    let fn = code;
+    if (!(code instanceof Function))
+        fn = eval("(" + code + ")");
+    else
+        code = fn.toString();
+
+    let parameters = parse_parameters(code);
 
     let target_input = null;
     let params_input = null;
@@ -217,19 +232,20 @@ function add_model(code)
             values: $settings.references,
             dropdown: true,
             width: "120px",
-            height: "29px",
         };
         let prev = target_input;
         target_input = create_input("number", 0, settings, "target-" + fn.name);
         if (prev != null)
             prev.replaceWith(target_input);
 
+        /*
         prev = params_input;
         settings.values = $settings.parameter_names;
         settings.multiple = true;
         params_input = create_input("number", 0, settings, "target-" + fn.name);
         if (prev != null)
             prev.replaceWith(params_input);
+        */
     };
 
     refresh_targets();
@@ -237,6 +253,12 @@ function add_model(code)
     let dataset, interval_id;
     let stop_fitting = () => {
         clearInterval(interval_id);
+
+        let param_str = "";
+        for (let i = 0; i < variables.length; i++)
+            param_str += `const float ${parameters[i+1]} = ${variables[i].dataSync()[0]};\n`;
+        console.log(param_str);
+
         for (let i = 0; i < dataset.x.length; i++)
             tf.dispose(dataset.x[i]);
         tf.dispose(dataset.y);
@@ -264,7 +286,7 @@ function add_model(code)
     let controls = document.createElement("div");
     controls.style = "display: flex; flex-direction: row; width: 100%";
     controls.appendChild(target_input);
-    controls.appendChild(params_input);
+    //controls.appendChild(params_input);
     controls.appendChild(button);
 
     let editor = document.createElement("div");
@@ -293,13 +315,12 @@ function add_model(code)
         console.log("model was recompiled");
         $settings.models[fn.name].predict = new_predict;
         $settings.plots[fn.name].predict = new_predict;
-        $settings.plots[fn.name].data = null;
-        redraw_plots();
+        refresh_plot(fn.name);
     });
 
-    let variables = [];
-    for (let i = 1; i < parameters.length; i++)
-        variables.push( tf.variable(tf.scalar(0)) );
+    let variables = new Array(parameters.length - 1);
+    for (let i = 0; i < variables.length; i++)
+        variables[i] = tf.variable(tf.scalar(Math.random()));
 
     let predict = (x) => fn(x, ...variables);
 
@@ -307,15 +328,37 @@ function add_model(code)
     $settings.plots[fn.name] = { data: null, display: true, predict, parameters };
 }
 
+function validate_reference(code)
+{
+    try {
+        let func = eval("(" + code + ")");
+        func(...new Array($settings.dimensions - 1).fill(0));
+        return func;
+    } catch (error) {
+        return null;
+    }
+}
+
 function add_reference(code, display)
 {
-    let fn = eval("(" + code + ")");
-    parameter = parse_parameters(code);
+    let fn;
+    if (code instanceof Function)
+    {
+        fn = code;
+        code = fn.toString();
+    }
+
+    let parameters = parse_parameters(code);
     generate_sliders(parameters);
+
+    if (fn == null)
+        fn = validate_reference(code);
+    if (fn == null)
+        fn = validate_reference("() => 0");
 
     let [input, label] = create_input("checkbox", display, {label: "Display"}, "display-" + fn.name, () => {
         $settings.plots[fn.name].display = input.checked;
-        redraw_plots();
+        draw_plots();
     });
 
     let editor = document.createElement("div");
@@ -327,15 +370,12 @@ function add_reference(code, display)
         if ($settings.plots[fn.name].display == false)
             return;
 
-        let new_func;
-        try {
-            new_func = eval("(" + new_code + ")");
-            new_func(...new Array($settings.dimensions - 1).fill(0));
-        } catch (error) { return; } // Syntax error
+        let new_func = validate_reference(new_code);
+        if (new_func == null) return;
 
+        window[fn.name] = new_func;
         $settings.plots[fn.name].func = new_func;
-        $settings.plots[fn.name].data = null;
-        redraw_plots();
+        refresh_plot(fn.name);
     });
 
     $settings.references.push(fn.name);
@@ -344,7 +384,7 @@ function add_reference(code, display)
 
     $settings.plots[fn.name] = { func: fn, data: null, display, parameters };
     if (display)
-        redraw_plots();
+        draw_plots();
 }
 
 /// SLIDERS
@@ -397,7 +437,6 @@ function ensure_sliders()
         $settings.sliders[i].active = -1;
 
     $settings.sliders = new Array(num_sliders);
-    html = num_sliders != 0 ? "<br/>" : "";
     for (let i = 0; i < num_sliders; i++)
     {
         let active = null;
@@ -415,46 +454,64 @@ function ensure_sliders()
         active.active = i;
     }
 
+    $settings.sliderElement.innerHTML = "";
     for (let i = 0; i < num_sliders; i++)
     {
-        html += `<div style="display: flex; flex-direction: row"> <select class='form-select' style='width: 150px' onchange='update_slider(${i})'>`;
+        if (i != 0)
+            $settings.sliderElement.append(document.createElement("hr"));
+
+        let index = i;
+        let div = document.createElement("div");
+        div.style = "display: flex";
+
+        let html = "";
+        let dropdown = document.createElement("select");
+        dropdown.style = "width: 110px; margin-right: 10px";
+        dropdown.className = "form-select form-select-sm";
         for (let j = 0; j < $settings.parameters.length; j++)
         {
-            let slider = $settings.parameters[j];
-            let selected = (slider.active == i) ? "selected" : "";
-            if (slider.active == -1 || slider.active == i)
-                html += `<option value='${j}' ${selected}>${slider.name}</option>`;
+            let param = $settings.parameters[j];
+            let selected = (param.active == i) ? "selected" : "";
+            if (param.active == -1 || param.active == i)
+                html += `<option value='${j}' ${selected}>${param.name}</option>`;
         }
-        html += `</select>
-        <label for="slider-${i}" style="margin: 5px; width: 50px"></label>
-        <input style='margin-top: 5px' type="range" class="form-range" id="slider-${i}" min="0" max="1" value="${$settings.sliders[i].value}" step="0.001" oninput="on_slider_change(${i})">
-        </div>`;
+        dropdown.innerHTML = html;
+        dropdown.onchange = () => {
+            let selected = parseInt(dropdown.value);
+
+            $settings.sliders[i].active = -1;
+            $settings.sliders[i] = $settings.parameters[selected];
+            $settings.sliders[i].active = index;
+            refresh_all_plots();
+        };
+
+        let value = truncate($settings.sliders[i].value, 3);
+        let value_label = document.createElement("div");
+        value_label.style = "padding: 2px";
+        value_label.innerText = value;
+
+        div.append(dropdown);
+        div.append(value_label);
+        $settings.sliderElement.append(div);
+
+        let slider = document.createElement("input");
+        slider.style = "margin-top: 5px";
+        slider.className = "form-range";
+        slider.type = "range";
+        slider.id = "slider-" + i;
+        slider.value = value;
+        slider.min = 0;
+        slider.max = 1;
+        slider.step = 0.001;
+        slider.oninput = () => {
+            value = truncate(slider.valueAsNumber, 3);
+            value_label.innerText = value;
+            $settings.sliders[index].value = value;
+            refresh_all_plots(false);
+        }
+
+        $settings.sliderElement.append(slider);
     }
-    let sliders = document.querySelector('#sliders');
-    sliders.innerHTML = html;
-
-    //for (let i = 0; i < num_sliders; i++)
-    //    on_slider_change(i);
-}
-
-function update_slider(index)
-{
-    let sliderDiv = document.querySelector('#sliders').children[index + 1]; // skip <br>
-    let selected = parseInt(sliderDiv.children[0].value);
-
-    $settings.sliders[index].active = -1;
-    $settings.sliders[index] = $settings.parameters[selected];
-    $settings.sliders[index].active = index;
-    dirty_functions();
-}
-
-function on_slider_change(index)
-{
-    let sliderDiv = document.querySelector('#sliders').children[index + 1]; // skip <br>
-    let value = truncate(sliderDiv.children[2].valueAsNumber, 3);
-    sliderDiv.children[1].innerText = value;
-    $settings.sliders[index].value = value;
-    dirty_functions(false);
 }
 
 /// HTML
@@ -474,7 +531,7 @@ function create_input(type, value, settings, id, onChange)
         if (settings.dropdown == true)
         {
             input = document.createElement("select");
-            input.className = "form-select";
+            input.className = "form-select form-select-sm";
             let html = "";
             for (let j = 0; j < settings.values.length; j++)
                 html += `<option value='${j}' ${j==value?"selected":""}>${settings.values[j]}</option>`;
@@ -509,7 +566,6 @@ function create_input(type, value, settings, id, onChange)
 
     input.id = id;
     let width = settings.width || "100%";
-    let height = settings.height || "24px";
 
     if (type == 'range')
     {
@@ -541,7 +597,7 @@ function create_input(type, value, settings, id, onChange)
         if (type == 'checkbox')
             input.style = "margin-right: 5px";
         else
-            input.style = `width: ${width}; height: ${height}; padding-bottom: 0; padding-top: 0`;
+            input.style = `width: ${width}; padding-bottom: 0; padding-top: 0`;
 
         if (!Array.isArray(settings.values))
         {
@@ -568,14 +624,20 @@ function create_input(type, value, settings, id, onChange)
 
 /// PLOT
 
-function dirty_functions(rebuild_sliders=true)
+function refresh_plot(name, rebuild_sliders=true)
+{
+    $settings.plots[name].data = null;
+    draw_plots(rebuild_sliders);
+}
+
+function refresh_all_plots(rebuild_sliders=true)
 {
     for (let name in $settings.plots)
         $settings.plots[name].data = null;
-    redraw_plots(rebuild_sliders);
+    draw_plots(rebuild_sliders);
 }
 
-function redraw_plots(rebuild_sliders=true)
+function draw_plots(rebuild_sliders=true)
 {
     if ($settings.dimensions == undefined)
         return;
@@ -595,9 +657,10 @@ function redraw_plots(rebuild_sliders=true)
 
     let div = document.querySelector('#plot');
     Plotly.react(div, traces, {
-        width: "50%",
+        title: "Main Plot",
         xaxis: { range: [-0.1, 1.1] },
         yaxis: { range: [-0.1, 1.1] },
+        zaxis: { range: [-0.1, 1.1] },
     })
 }
 
