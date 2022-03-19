@@ -146,30 +146,47 @@ function generate_dataset(func)
     return { x_values: px, y_values: py };
 }
 
-function fit_function(model, parameters, data)
+function fit_function(model, dataset, onstep, onfinish)
 {
     if (this.worker == null)
     {
-        let workerScript = 'fit_function_worker.js';
-        let workersPackage = 'amd_ww.js';
-        this.worker = window.amd_ww.startWorkers({filename: workerScript});
+        this.jobs = {};
+        this.worker = new Worker("fit_function_worker.js");
+        this.worker.onerror = (e) => console.error(e);
+        this.worker.onmessage = (event) => {
+
+            let job = this.jobs[event.data.name];
+            if (event.data.type == "onfinish")
+                delete this.jobs[event.data.name];
+
+            let variables = job.model.variables;
+            for (let i = 0; i < variables.length; i++)
+            {
+                variables[i].value = event.data.payload[i];
+                variables[i].refresh_input();
+            }
+
+            job.model.rebuild_model();
+            job[event.data.type](event.data.payload);
+        };
     }
 
-    return this.worker.submit({
-        model: model.toString(),
-        parameters: parameters,
-        data: data,
-    });
-}
+    let values = new Array(model.variables.length);
+    for (let i = 0; i < model.variables.length; i++)
+        values[i] = model.variables[i].value;
 
+    let job = {
+        model,
+        onstep,
+        onfinish,
+    }
 
-async function fit() {
+    let job_data = {
+        model: model.func.toString(),
+        parameters: values,
+        dataset,
+    };
 
-    let model = model_f;
-    let parameters = [1, 1, 1, 1, 1, 1];
-    var data1 = generate_dataset(fgd_ref);
-
-    //Fits the data asynchronously
-    let res = await fit_function(model, parameters, data1);
-    console.log(res);
+    this.jobs[model.func.name] = job;
+    this.worker.postMessage(job_data);
 }

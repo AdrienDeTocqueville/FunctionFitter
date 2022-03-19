@@ -25,11 +25,12 @@
     }
 
     // Error metrics
-    function squared_error(fun, X, y, x0)
+    function squared_error(model, dataset, params)
     {
-        let error = 0, n = X.length;
+        let x = dataset.x_values, y = dataset.y_values;
+        let error = 0, n = x.length;
         for (let i = 0; i < n; i++)
-            error += Math.pow(fun(X[i], ...x0) - y[i], 2);
+            error += Math.pow(model(x[i], ...params) - y[i], 2);
         return error;
     }
 
@@ -54,9 +55,11 @@
     }
 
     // Non linear least squares implementation
-    function lstsq(fun, x0, X, y, options)
+    // https://github.com/adussaq/amd_cf
+    function lstsq({model, initial_values, dataset}, options)
     {
-        let x1 = x0.splice(); // duplicate array
+        let x0 = initial_values;
+        let x1 = initial_values.splice();
 
         let iter = 0, lastError = Infinity;
         for (; iter < options.max_iteration; iter++)
@@ -65,7 +68,7 @@
             for (let i = 0; i < x0.length; i++)
             {
                 x1[i] += options.step[i];
-                if (squared_error(fun, X, y, x1) < squared_error(fun, X, y, x0))
+                if (squared_error(model, dataset, x1) < squared_error(model, dataset, x0))
                 {
                     x0[i] = x1[i];
                     options.step[i] *= options.converge;
@@ -80,17 +83,18 @@
             // Check termination condition
             if ((iter % options.update_period) === 0)
             {
-                let sse = squared_error(fun, X, y, x0);
+                let sse = squared_error(model, dataset, x0);
                 if (Math.abs(1 - sse / lastError) < options.min_error) {
                     break;
                 }
                 lastError = sse;
+                self.postMessage({type: "onstep", name: model.name, payload: x0});
             }
         }
 
         //I added the following 'R^2' like calculation.
-        let SSDTot = sqrSumOfDeviations(y);
-        let SSETot = squared_error(fun, X, y, x0);
+        let SSDTot = sqrSumOfDeviations(dataset.y_values);
+        let SSETot = squared_error(model, dataset, x0);
         let corrIsh = 1 - SSETot / SSDTot;
 
         //Check if fitting converged
@@ -110,10 +114,9 @@
     self.onmessage = function (event) {
 
         let data = {
-            func: eval("(" + event.data.model + ")"),
+            model: eval("(" + event.data.model + ")"),
             initial_values: event.data.parameters,
-            X: event.data.data.x_values,
-            y: event.data.data.y_values,
+            dataset: event.data.dataset,
         }
 
         //variable declarations
@@ -121,13 +124,13 @@
             step: [...new Array(data.initial_values.length)].fill(1 / 100),
             max_iteration: 1000,
             min_error: 1e-6,
-            update_period: 3,
+            update_period: 50,
             converge: 1.2,
             diverge: -0.5
         };
 
-        let result = lstsq(data.func, data.initial_values, data.X, data.y, options);
-        self.postMessage({type: "onfinish", data: result});
+        let result = lstsq(data, options);
+        self.postMessage({type: "onfinish", name: data.model.name, payload: result.parameters});
     };
 
 }());

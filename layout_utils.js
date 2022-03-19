@@ -293,7 +293,8 @@ function add_model(code)
         return values;
     }
 
-    $settings.models[fn.name] = { ref: $settings.references[0], variables };
+    let model = { ref: $settings.references[0], func: fn, variables };
+    $settings.models[fn.name] = model;
     $settings.plots[fn.name] = { data: null, display: true, parameters };
 
     // Create UI
@@ -306,10 +307,10 @@ function add_model(code)
         return new_value;
     }
 
-    $settings.models[fn.name].refresh_targets = () => {
-        if ($settings.models[fn.name].ref == undefined)
-            $settings.models[fn.name].ref = $settings.references[0];
-        let ref = $settings.models[fn.name].ref;
+    model.refresh_targets = () => {
+        let ref = model.ref;
+        if (ref == undefined)
+            model.ref = ref = $settings.references[0];
         let ref_index = $settings.references.indexOf(ref);
 
         let settings = {
@@ -318,7 +319,7 @@ function add_model(code)
             width: "120px",
         };
         target_input = replace_elem(target_input, create_input("number", ref_index, settings, "target-" + fn.name, (new_index) => {
-            $settings.models[fn.name].ref = settings.values[new_index];
+            model.ref = settings.values[new_index];
         }));
 
         /*
@@ -328,8 +329,8 @@ function add_model(code)
         */
     };
 
-    $settings.models[fn.name].refresh_mse = () => {
-        let ref = $settings.models[fn.name].ref;
+    model.refresh_mse = () => {
+        let ref = model.ref;
         let predict = $settings.plots[fn.name].predict;
 
         let mse = 0, dataset = get_dataset(ref);
@@ -343,18 +344,30 @@ function add_model(code)
         mse_label = replace_elem(mse_label, new_label);
     };
 
-    $settings.models[fn.name].rebuild_model = () => {
+    model.rebuild_model = () => {
         let values = get_variable_values();
         $settings.plots[fn.name].predict = (x) => fn(x, ...values);
-        $settings.models[fn.name].refresh_mse();
+        model.refresh_mse();
         refresh_plot(fn.name);
     };
 
-    $settings.models[fn.name].refresh_targets();
-    $settings.models[fn.name].rebuild_model();
+    model.refresh_targets();
+    model.rebuild_model();
 
-    let stop_fitting = () => {
+    let onstart = () => {
+        if (button.innerText == "...")
+            return onfinish();
+
+        button.innerText = "...";
+
+        let ref = $settings.references[target_input.value];
+        fit_function(model, get_dataset(ref), onstep, onfinish);
+    };
+    let onstep = () => {
+    };
+    let onfinish = (new_parameters) => {
         button.innerText = "Fit";
+        model.rebuild_model();
     }
 
     let button = document.createElement("button");
@@ -362,27 +375,7 @@ function add_model(code)
     button.type = "button";
     button.classList.add('btn', 'btn-primary');
     button.innerText = "Fit";
-    button.onclick = () => {
-        if (button.innerText == "...")
-            return stop_fitting();
-
-        button.innerText = "...";
-
-        let ref = $settings.references[target_input.value];
-        let values = get_variable_values();
-        fit_function(fn, values, get_dataset(ref)).then((event) => {
-            if (event.type == "onfinish")
-            {
-                button.innerText = "Fit";
-                for (let i = 0; i < variables.length; i++)
-                {
-                    variables[i].value = event.data.parameters[i];
-                    variables[i].refresh_input();
-                }
-                $settings.models[fn.name].rebuild_model();
-            }
-        });
-    }
+    button.onclick = onstart;
 
     let controls = document.createElement("div");
     controls.style = "display: flex; flex-direction: row; width: 100%";
@@ -413,7 +406,8 @@ function add_model(code)
             return;
 
         fn = new_func;
-        $settings.models[fn.name].rebuild_model();
+        model.func = new_func;
+        model.rebuild_model();
         console.log("model was recompiled");
     });
 }
