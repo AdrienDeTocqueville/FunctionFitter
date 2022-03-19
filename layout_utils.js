@@ -1,3 +1,5 @@
+print = console.log;
+
 $settings = {
     LUTs: {},
     plots: {},
@@ -59,6 +61,47 @@ function hook_add_buttons()
     }
     document.querySelector("#add_ref").onclick = () => {
         add_reference(default_func, false);
+    }
+
+    let editor = null;
+    document.querySelector("#edit_variables").onclick = () => {
+        let variable_list = document.querySelector("#variable_list");
+        if (editor == null)
+        {
+            let values = "", count = 0;
+            for (let name in $settings.variables)
+            {
+                count++;
+                values += `${name} = ${$settings.variables[name].value}\n`;
+            }
+
+            editor = document.createElement("textarea");
+            editor.rows = count + 4;
+            editor.style = "width: 100%";
+            editor.value = values;
+            variable_list.parentNode.insertBefore(editor, variable_list);
+            variable_list.style = "display: none";
+        }
+        else
+        {
+            let values = editor.value.split(/[\r\n]+/);
+            for (let value of values)
+            {
+                let parts = value.split(/\s*=\s*/);
+                if (parts.length != 2) continue;
+                let variable = $settings.variables[parts[0].trim()];
+                if (variable == null) continue;
+                variable.value = parseFloat(parts[1].trim());
+                variable.refresh_input();
+            }
+
+            for (let name in $settings.models)
+                $settings.models[name].rebuild_model();
+
+            editor.remove();
+            editor = null;
+            variable_list.style = "display: block";
+        }
     }
 }
 
@@ -195,6 +238,14 @@ function parse_parameters(code)
     return parameters;
 }
 
+/*
+function test([a, b], [a0, b0])
+{
+    return 1;
+}
+print(parse_parameters(test.toString()));
+*/
+
 function create_code_editor(code, div, min_line_count, onChange)
 {
     let line_count = Math.min(min_line_count, code.split(/\r\n|\r|\n/).length);
@@ -232,13 +283,18 @@ function add_model(code)
     for (let i = 0; i < variables.length; i++)
     {
         let name = parameters[i+1];
-       variables[i] = get_or_create_variable(name, Math.random());
+       variables[i] = get_or_create_variable(name);
     }
 
-    let predict = (x) => fn(x, ...variables);
+    let get_variable_values = () => {
+        let values = new Array(variables.length);
+        for (let i = 0; i < variables.length; i++)
+            values[i] = variables[i].value;
+        return values;
+    }
 
-    $settings.models[fn.name] = { error: Infinity, ref: $settings.references[0], variables, predict };
-    $settings.plots[fn.name] = { data: null, display: true, predict, parameters };
+    $settings.models[fn.name] = { ref: $settings.references[0], variables };
+    $settings.plots[fn.name] = { data: null, display: true, parameters };
 
     // Create UI
     let target_input = null;
@@ -272,10 +328,14 @@ function add_model(code)
         */
     };
 
-    $settings.models[fn.name].refresh_mse = (mse) => {
+    $settings.models[fn.name].refresh_mse = () => {
         let ref = $settings.models[fn.name].ref;
-        mse = mse || compute_mse(predict, get_dataset(ref));
-        $settings.models[fn.name].error = mse;
+        let predict = $settings.plots[fn.name].predict;
+
+        let mse = 0, dataset = get_dataset(ref);
+        for (let i = 0; i < dataset.x_values.length; i++)
+            mse += Math.pow(predict(dataset.x_values[i]) - dataset.y_values[i], 2);
+        mse /= dataset.x_values.length;
 
         let new_label = document.createElement("div");
         new_label.style = "padding: 2px; margin-left: 20px";
@@ -283,18 +343,17 @@ function add_model(code)
         mse_label = replace_elem(mse_label, new_label);
     };
 
+    $settings.models[fn.name].rebuild_model = () => {
+        let values = get_variable_values();
+        $settings.plots[fn.name].predict = (x) => fn(x, ...values);
+        $settings.models[fn.name].refresh_mse();
+        refresh_plot(fn.name);
+    };
+
     $settings.models[fn.name].refresh_targets();
-    $settings.models[fn.name].refresh_mse();
+    $settings.models[fn.name].rebuild_model();
 
-    let interval_id;
     let stop_fitting = () => {
-        clearInterval(interval_id);
-
-        let param_str = "";
-        for (let i = 0; i < variables.length; i++)
-            param_str += `const float ${parameters[i+1]} = ${variables[i].dataSync()[0]};\n`;
-        console.log(param_str);
-
         button.innerText = "Fit";
     }
 
@@ -310,7 +369,19 @@ function add_model(code)
         button.innerText = "...";
 
         let ref = $settings.references[target_input.value];
-        interval_id = setInterval(training_step, 50, fn.name, get_dataset(ref), stop_fitting);
+        let values = get_variable_values();
+        fit_function(fn, values, get_dataset(ref)).then((event) => {
+            if (event.type == "onfinish")
+            {
+                button.innerText = "Fit";
+                for (let i = 0; i < variables.length; i++)
+                {
+                    variables[i].value = event.data.parameters[i];
+                    variables[i].refresh_input();
+                }
+                $settings.models[fn.name].rebuild_model();
+            }
+        });
     }
 
     let controls = document.createElement("div");
@@ -331,67 +402,51 @@ function add_model(code)
         let validate_model = () => {
             try {
                 let new_func = eval("(" + new_code + ")");
-                let new_predict = (x) => new_func(x, ...variables);
-                new_predict([...new Array($settings.dimensions - 1)].fill(tf.scalar(0)));
-                return new_predict;
+                new_func([...new Array($settings.dimensions - 1)].fill(0), ...get_variable_values());
+                return new_func;
             }
             catch (error) { console.log(error); } // Syntax error
         };
 
-        let new_predict = tf.tidy(validate_model);
-        if (new_predict == undefined)
+        let new_func = validate_model();
+        if (new_func == undefined || new_func.name != fn.name)
             return;
 
+        fn = new_func;
+        $settings.models[fn.name].rebuild_model();
         console.log("model was recompiled");
-        $settings.models[fn.name].predict = new_predict;
-        $settings.plots[fn.name].predict = new_predict;
-        refresh_plot(fn.name);
     });
 }
 
-function get_or_create_variable(name, value)
+function get_or_create_variable(name)
 {
-    if ($settings.variables[name] == null)
+    let variable = $settings.variables[name];
+    if (variable == null)
     {
+        variable = { value: Math.random() };
+
         let settings = { label: name, step: 0.00001 }
-        let [input, label] = create_input("number", truncate(value, 5), settings, "variable-" + name, (value) => {
-            let tensor = $settings.variables[name].tensor;
-            tf.tidy(() => tensor.assign(tf.scalar(value)));
+        let [input, label] = create_input("number", null, settings, "variable-" + name, (new_value) => {
+            variable.value = new_value;
 
             for (let name in $settings.models)
             {
-                for (let variable of $settings.models[name].variables)
-                {
-                    if (variable === tensor)
-                    {
-                        refresh_plot(name);
-                        $settings.models[name].refresh_mse();
-                        break;
-                    }
-                }
+                if ($settings.models[name].variables.includes(variable))
+                    $settings.models[name].rebuild_model();
             }
         });
 
+        variable.refresh_input = () => {
+            input.valueAsNumber = truncate(variable.value, 5);
+        };
+
+        variable.refresh_input();
         label.style = "margin-right: 10px";
         add_list_element('#variable_list', "display: flex; flex-direction: row", [label, input]);
 
-        value = tf.scalar(value);
-        $settings.variables[name] = { tensor: tf.variable(value), input };
-        tf.dispose(value);
+        $settings.variables[name] = variable;
     }
-    return $settings.variables[name].tensor;
-}
-
-function refresh_variable(tensor)
-{
-    for (let name in $settings.variables)
-    {
-        if ($settings.variables[name].tensor === tensor)
-        {
-            $settings.variables[name].input.valueAsNumber = truncate(tensor.dataSync()[0], 5);
-            return;
-        }
-    }
+    return variable;
 }
 
 function validate_reference(code)
@@ -699,7 +754,7 @@ function get_dataset(name)
     if (plot == null)
         return null;
     if (plot.dataset == null)
-        plot.dataset = generate_dataset(plot);
+        plot.dataset = generate_dataset(plot.func);
     return plot.dataset;
 }
 
@@ -708,12 +763,7 @@ function _dirty_plot(name)
     let plot = $settings.plots[name];
     plot.data = null;
     if (plot.dataset != null)
-    {
-        for (let i = 0; i < plot.dataset.x.length; i++)
-            tf.dispose(plot.dataset.x[i]);
-        tf.dispose(plot.dataset.y);
         plot.dataset = null;
-    }
     if (plot.predict == null)
     {
         for (let model in $settings.models)
@@ -814,34 +864,35 @@ function evaluate_func(plot)
     let parameters = new Array(inputs.length);
     if (plot.predict != null)
     {
-        tf.tidy(() => {
-            let tmp_array = new Array(resolution);
-            for (let i = 0; i < parameters.length; i++)
-            {
-                if (!Array.isArray(inputs[i]))
-                {
-                    tmp_array.fill(inputs[i]);
-                    parameters[i] = tf.tensor(tmp_array);
-                }
-            }
+        for (let i = 0; i < parameters.length; i++)
+        {
+            if (!Array.isArray(inputs[i]))
+                parameters[i] = inputs[i];
+        }
 
-            if ($settings.graph_dimensions == 2)
+        if ($settings.graph_dimensions == 2)
+        {
+            for (let i = 0; i < resolution; i++)
             {
-                parameters[axis_x] = tf.tensor(inputs[axis_x]);
-                trace.y = plot.predict(parameters).dataSync();
+                parameters[axis_x] = inputs[axis_x][i];
+                trace.y[i] = plot.predict(parameters);
             }
-            else if ($settings.graph_dimensions == 3)
+        }
+        else if ($settings.graph_dimensions == 3)
+        {
+            for (let i = 0; i < resolution; i++)
             {
-                for (let i = 0; i < resolution; i++)
-                {
-                    tmp_array.fill(inputs[axis_x][i]);
-                    parameters[axis_x] = tf.tensor(tmp_array);
-                    parameters[axis_y] = tf.tensor(inputs[axis_y]);
+                parameters[axis_x] = inputs[axis_x][i];
 
-                    trace.z[i] = plot.predict(parameters).dataSync();
+                let row = new Array(resolution);
+                for (let j = 0; j < resolution; j++)
+                {
+                    parameters[axis_y] = inputs[axis_y][j];
+                    row[j] = plot.predict(parameters);
                 }
+                trace.z[i] = row;
             }
-        });
+        }
     }
     else
     {

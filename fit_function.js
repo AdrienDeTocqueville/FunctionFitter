@@ -1,11 +1,11 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera\launcher.exe --allow-file-access-from-files
 
-function model_f(x, a0, b0, c0, a1, b1, c1)
+function model_f (x, a0, b0, c0, a1, b1, c1)
 {
     let [NdotV, roughness] = x;
     let b = polynom(roughness, a0, b0, c0);
     let d = polynom(roughness, a1, b1, c1);
-    return polynom(NdotV.add(-0.74), tf.scalar(0), b, tf.scalar(0), d);
+    return polynom(NdotV - 0.74, 0, b, 0, d);
 }
 function fgd_ref(NdotV, roughness)
 {
@@ -53,13 +53,13 @@ function polynom(x)
     let x_p = x;
     for (let i = 2; i < arguments.length; i++)
     {
-        res = res.add(x_p.mul(arguments[i]));
-        x_p = x_p.mul(x);
+        res += x_p * arguments[i];
+        x_p *= x;
     }
     return res;
 }
 
-function random(min, max)
+function random(min = 0, max = 1)
 {
     return Math.random() * (max - min) + min;
 }
@@ -90,126 +90,86 @@ async function main()
 }
 main()
 
-
-const learningRate = 0.1;
-const fitThreshold = 0.0001;
-const optimizer = tf.train.adam(learningRate);
-
-function generate_dataset(ref)
+function generate_dataset(func)
 {
+    let px = null, py = null;
     let [inputs, resolution, axis_x, axis_y] = generate_parameters();
 
     if ($settings.graph_dimensions == 2)
     {
-        return tf.tidy(() => {
-            let px = new Array(inputs.length);
+        px = new Array(resolution);
+        for (let i = 0; i < px.length; i++)
+            px[i] = new Array(inputs.length);
 
-            let parameters = new Array(inputs.length);
-            let tmp_array = new Array(resolution);
-            for (let i = 0; i < px.length; i++)
+        for (let i = 0; i < inputs.length; i++)
+        {
+            if (!Array.isArray(inputs[i]))
             {
-                if (!Array.isArray(inputs[i]))
-                {
-                    tmp_array.fill(inputs[i]);
-                    px[i] = tf.tensor(tmp_array);
-                    parameters[i] = inputs[i];
-                }
-                else
-                    px[i] = tf.tensor(inputs[i]);
-
-                px[i] = tf.keep(px[i]);
+                for (let j = 0; j < px.length; j++)
+                    px[j][i] = inputs[i];
             }
-
-            for (let i = 0; i < resolution; i++)
-            {
-                parameters[axis_x] = inputs[axis_x][i];
-                tmp_array[i] = ref.func(...parameters);
-            }
-            let py = tf.keep(tf.tensor(tmp_array));
-
-            return { x: px, y: py };
-        });
+        }
+        for (let j = 0; j < resolution; j++)
+            px[j][axis_x] = inputs[axis_x][j];
     }
     else
     {
-        return tf.tidy(() => {
-            let px = new Array(inputs.length);
+        px = new Array(resolution*resolution);
+        for (let i = 0; i < px.length; i++)
+            px[i] = new Array(inputs.length);
 
-            let parameters = new Array(inputs.length);
-            let tmp_array = new Array(resolution*resolution);
-            for (let i = 0; i < px.length; i++)
+        for (let i = 0; i < inputs.length; i++)
+        {
+            if (!Array.isArray(inputs[i]))
             {
-                if (!Array.isArray(inputs[i]))
-                {
-                    tmp_array.fill(inputs[i]);
-                    parameters[i] = inputs[i];
-                }
-                else if (i == axis_x)
-                {
-                    for (let j = 0; j < resolution; j++)
-                    {
-                        for (let k = 0; k < resolution; k++)
-                            tmp_array[j*resolution+k] = inputs[i][k];
-                    }
-                }
-                else if (i == axis_y)
-                {
-                    for (let j = 0; j < resolution; j++)
-                    {
-                        for (let k = 0; k < resolution; k++)
-                            tmp_array[j*resolution+k] = inputs[i][j];
-                    }
-                }
-
-                px[i] = tf.keep(tf.tensor(tmp_array));
+                for (let j = 0; j < px.length; j++)
+                    px[j][i] = inputs[i];
             }
-
-            for (let i = 0; i < resolution; i++)
+        }
+        for (let j = 0; j < resolution; j++)
+        {
+            for (let k = 0; k < resolution; k++)
             {
-                parameters[axis_x] = inputs[axis_x][i];
-                for (let j = 0; j < resolution; j++)
-                {
-                    parameters[axis_y] = inputs[axis_y][j];
-                    tmp_array[i*resolution+j] = ref.func(...parameters);
-                }
+                px[j*resolution+k][axis_x] = inputs[axis_x][k];
+                px[j*resolution+k][axis_y] = inputs[axis_y][j];
             }
-            let py = tf.keep(tf.tensor(tmp_array));
-
-            return { x: px, y: py };
-        });
+        }
     }
+
+    if (func != undefined)
+    {
+        py = new Array(px.length);
+        for (let i = 0; i < px.length; i++)
+            py[i] = func(...px[i]);
+    }
+
+    return { x_values: px, y_values: py };
 }
 
-function mse_loss(func, dataset)
+function fit_function(model, parameters, data)
 {
-    let error = func(dataset.x).sub(dataset.y);
-    return error.square().mean();
-}
+    if (this.worker == null)
+    {
+        let workerScript = 'fit_function_worker.js';
+        let workersPackage = 'amd_ww.js';
+        this.worker = window.amd_ww.startWorkers({filename: workerScript});
+    }
 
-function compute_mse(func, dataset)
-{
-    return dataset == null ? Infinity : tf.tidy(() => mse_loss(func, dataset).dataSync()[0]);
-}
-
-function training_step(model_name, dataset, onFinish)
-{
-    model = $settings.models[model_name];
-
-    var error = tf.tidy(() => {
-
-        let loss = () => mse_loss(model.predict, dataset);
-
-        for (let i = 0; i < 100; i++)
-            optimizer.minimize(loss, false);
-
-        return optimizer.minimize(loss, true).dataSync()[0];
+    return this.worker.submit({
+        model: model.toString(),
+        parameters: parameters,
+        data: data,
     });
+}
 
-    for (let variable of model.variables)
-        refresh_variable(variable);
 
-    let fitted = error < 0.001 && Math.abs(model.error - error) < fitThreshold;
-    model.refresh_mse(error);
-    refresh_plot(model_name);
-    if (fitted) onFinish();
+async function fit() {
+
+    let model = model_f;
+    let parameters = [1, 1, 1, 1, 1, 1];
+    var data1 = generate_dataset(fgd_ref);
+
+    //Fits the data asynchronously
+    let res = await fit_function(model, parameters, data1);
+    console.log(res);
 }
