@@ -21,6 +21,17 @@ shape_selector.onchange = () => {
 }
 $settings.graph_dimensions = parseInt(shape_selector.value);
 
+document.querySelector("#switch-theme").onclick = () => {
+    let prev_theme = document.body.className || "light-theme";
+    theme = prev_theme == "dark-theme" ? "light-theme" : "dark-theme"
+
+    document.body.className = theme;
+    document.querySelectorAll("li").forEach(elem => {
+        elem.classList.remove(prev_theme);
+        elem.classList.add(theme);
+    });
+}
+
 Split(["#controls", "#plots", "#settings"], {sizes: [20, 40, 40]});
 
 let default_func = `function new_function(x, y)

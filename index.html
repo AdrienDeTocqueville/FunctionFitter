@@ -11,17 +11,37 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js" integrity="sha512-6ts6Fu561/yzWvD6uwQp3XVYwiWNpWnZ0hdeQrETqtnQiGjTfOS06W76aUDnq51hl1SxXtJaqy7IsZ3oP/uZEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
+        .dark-theme {
+            background-color: var(--bs-dark);
+            color: var(--bs-light);
+            border-color: #444444;
+        }
+        .light-theme {
+            background-color: var(--bs-light);
+            color: var(--bs-dark);
+            border-color: rgba(0,0,0,.125);
+        }
+
         body > header {
             height: 3em;
             color: white;
 
             background-color: #24292E;
+            position: relative;
 
             display: flex;
             justify-content: center;
             align-items: center;
 
             box-shadow: 0 1px 6px 0 rgba(0,0,0,0.4);
+        }
+
+        .header-list {
+            display: flex;
+            position: absolute;
+        }
+        header > #right {
+            right: 15px;
         }
 
         hr {
@@ -80,7 +100,11 @@
 
 <body>
     <header>
+        <div id="left" class="header-list"></div>
         <a><strong>Function Fitter</strong></a>
+        <div id="right" class="header-list">
+            <i class="fa-solid fa-circle-half-stroke" id="switch-theme"></i>
+        </div>
     </header>
 
     <main style="display: flex; flex-direction: row">
@@ -143,9 +167,6 @@
 	</main>
 
     <script src="split.js"></script>
-
-    <script src="amd_ww.js" defer></script>
-    <script src="fit_function_worker.js" defer></script>
 
     <script src="layout_utils.js" defer></script>
     <script src="fit_function.js" defer></script>
