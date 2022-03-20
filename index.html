@@ -40,9 +40,9 @@
             display: flex;
             position: absolute;
         }
-        header > #right {
-            right: 15px;
-        }
+        header > #right { right: 15px; }
+        header > #left { left: 15px; }
+        #left > i { padding-right: 15px; }
 
         hr {
             margin-top: 1rem;
@@ -98,9 +98,12 @@
     </style>
 </head>
 
-<body>
+<body class="light-theme">
     <header>
-        <div id="left" class="header-list"></div>
+        <div id="left" class="header-list">
+            <i class="fa-solid fa-bars"></i>
+            <i class="fa-solid fa-floppy-disk" id="save"></i>
+        </div>
         <a><strong>Function Fitter</strong></a>
         <div id="right" class="header-list">
             <i class="fa-solid fa-circle-half-stroke" id="switch-theme"></i>
@@ -168,6 +171,7 @@
 
     <script src="split.js"></script>
 
+    <script src="data_model.js" defer></script>
     <script src="layout_utils.js" defer></script>
     <script src="fit_function.js" defer></script>
 </body>

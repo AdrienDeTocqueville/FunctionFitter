@@ -1,9 +1,8 @@
-print = console.log;
-
 $settings = {
     LUTs: {},
     plots: {},
     models: {},
+    settings: {},
     references: [],
     parameter_names: [],
     dimensions: undefined,
@@ -11,6 +10,7 @@ $settings = {
     variables: {},
     sliders: [],
     sliderElement: document.querySelector('#sliders'),
+    theme: 0,
 };
 
 let shape_selector = document.querySelector("#shape-selector");
@@ -21,16 +21,7 @@ shape_selector.onchange = () => {
 }
 $settings.graph_dimensions = parseInt(shape_selector.value);
 
-document.querySelector("#switch-theme").onclick = () => {
-    let prev_theme = document.body.className || "light-theme";
-    theme = prev_theme == "dark-theme" ? "light-theme" : "dark-theme"
-
-    document.body.className = theme;
-    document.querySelectorAll("li").forEach(elem => {
-        elem.classList.remove(prev_theme);
-        elem.classList.add(theme);
-    });
-}
+document.querySelector("#switch-theme").onclick = () => set_theme(1 - $settings.theme);
 
 Split(["#controls", "#plots", "#settings"], {sizes: [20, 40, 40]});
 
@@ -40,6 +31,35 @@ let default_func = `function new_function(x, y)
 }`;
 
 hook_add_buttons();
+
+function random(min = 0, max = 1) { return Math.random() * (max - min) + min; }
+function truncate(x, precision=2) { return Number(x.toFixed(precision)); }
+function saturate(x)              { return Math.max(0, Math.min(x, 1)); }
+function lerp(a, t, b)            { return (1 - t) * a + t * b; }
+function polynom(x)
+{
+    let res = arguments[1];
+    let x_p = x;
+    for (let i = 2; i < arguments.length; i++)
+    {
+        res += x_p * arguments[i];
+        x_p *= x;
+    }
+    return res;
+}
+
+
+function set_theme(idx)
+{
+    let themes = ["light-theme", "dark-theme"];
+
+    $settings.theme = idx;
+    document.body.className = themes[idx];
+    document.querySelectorAll("li").forEach(elem => {
+        elem.classList.remove(themes[1-idx]);
+        elem.classList.add(themes[idx]);
+    });
+}
 
 /// LISTS
 
@@ -133,6 +153,7 @@ function load_lut_async(url, name, canvas)
             context.drawImage(img, 0, 0);
             data = context.getImageData(0, 0, img.width, img.height);
             data.bilinear = true;
+            data.url = url;
 
             let shouldReload = $settings.LUTs[name] != null;
             $settings.LUTs[name] = data;
@@ -146,7 +167,7 @@ function load_lut_async(url, name, canvas)
     });
 }
 
-function add_lut(url, name)
+function add_lut(url, name, bilinear = true)
 {
     if (name == null)
         name = url.replace(/\.[^/.]+$/, "");
@@ -186,7 +207,7 @@ function add_lut(url, name)
         refresh_all_plots();
     };
 
-    let [box, label] = create_input("checkbox", true, {label: "Bilinear Filtering"}, "bilinear-" + name, () => {
+    let [box, label] = create_input("checkbox", bilinear, {label: "Bilinear Filtering"}, "bilinear-" + name, () => {
         $settings.LUTs[name].bilinear = box.checked;
         refresh_all_plots();
     });
@@ -207,7 +228,7 @@ function add_lut(url, name)
 
 /// SETTINGS
 
-function add_setting(name, type, initial_value, settings)
+function add_setting(name, type, initial_value, settings = {})
 {
     // allowed types:
     //  - checkbox
@@ -220,7 +241,8 @@ function add_setting(name, type, initial_value, settings)
 
     window[name] = initial_value;
 
-    settings = settings || {};
+    $settings.settings[name] = { type, initial_value, settings: {...settings} };
+
     settings.label = name;
 
     let [input, label] = create_input(type, initial_value, settings, "settings-" + name, (value) => {
@@ -280,13 +302,16 @@ function create_code_editor(code, div, min_line_count, onChange)
     });
 }
 
-function add_model(code)
+function add_model(code, ref)
 {
     let fn = code;
     if (!(code instanceof Function))
         fn = eval("(" + code + ")");
     else
         code = fn.toString();
+
+    if (ref == undefined)
+        ref = $settings.references[0];
 
     let parameters = parse_parameters(code);
 
@@ -304,7 +329,7 @@ function add_model(code)
         return values;
     }
 
-    let model = { ref: $settings.references[0], func: fn, variables };
+    let model = { func: fn, variables, ref };
     $settings.models[fn.name] = model;
     $settings.plots[fn.name] = { data: null, display: true, parameters };
 
@@ -319,10 +344,9 @@ function add_model(code)
     }
 
     model.refresh_targets = () => {
-        let ref = model.ref;
-        if (ref == undefined)
-            model.ref = ref = $settings.references[0];
-        let ref_index = $settings.references.indexOf(ref);
+        if (model.ref == undefined)
+            model.ref = $settings.references[0];
+        let ref_index = $settings.references.indexOf(model.ref);
 
         let settings = {
             values: $settings.references,
@@ -423,12 +447,12 @@ function add_model(code)
     });
 }
 
-function get_or_create_variable(name)
+function get_or_create_variable(name, initial_value = undefined)
 {
     let variable = $settings.variables[name];
     if (variable == null)
     {
-        variable = { value: Math.random() };
+        variable = { value: initial_value || Math.random() };
 
         let settings = { label: name, step: 0.00001 }
         let [input, label] = create_input("number", null, settings, "variable-" + name, (new_value) => {
@@ -460,12 +484,10 @@ function validate_reference(code)
         let func = eval("(" + code + ")");
         func(...new Array($settings.dimensions - 1).fill(0));
         return func;
-    } catch (error) {
-        return null;
-    }
+    } catch (error) { console.error(error); }
 }
 
-function add_reference(code, display)
+function add_reference(code, display, refresh = true)
 {
     let fn;
     if (code instanceof Function)
@@ -473,14 +495,18 @@ function add_reference(code, display)
         fn = code;
         code = fn.toString();
     }
+    else
+    {
+        try {
+            fn = eval("(" + code + ")");
+        } catch (error) {
+            console.error(error);
+            return;
+        }
+    }
 
     let parameters = parse_parameters(code);
     generate_sliders(parameters);
-
-    if (fn == null)
-        fn = validate_reference(code);
-    if (fn == null)
-        fn = validate_reference("() => 0");
 
     let [input, label] = create_input("checkbox", display, {label: "Display"}, "display-" + fn.name, () => {
         $settings.plots[fn.name].display = input.checked;
@@ -499,7 +525,6 @@ function add_reference(code, display)
         let new_func = validate_reference(new_code);
         if (new_func == null) return;
 
-        window[fn.name] = new_func;
         $settings.plots[fn.name].func = new_func;
         refresh_plot(fn.name);
     });
@@ -508,9 +533,9 @@ function add_reference(code, display)
     for (let model in $settings.models)
         $settings.models[model].refresh_targets();
 
-
+    window[fn.name] = fn;
     $settings.plots[fn.name] = { func: fn, data: null, dataset: null, display, parameters };
-    refresh_plot(fn.name);
+    if (refresh) refresh_plot(fn.name);
 }
 
 /// SLIDERS
