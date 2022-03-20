@@ -1,13 +1,31 @@
+var $projects = load_project_list();
+
 print = console.log;
 
 document.querySelector("#save").onclick = () => {
-    document.cookie = JSON.stringify(serialize());
+    let name = document.querySelector("#project-name").innerText;
+    let projects = localStorage.getItem("projects");
+    projects = projects ? JSON.parse(projects) : {}
+    projects[name] = serialize();
+
+    localStorage.setItem("projects", JSON.stringify(projects));
+}
+
+function load_project_list()
+{
+    let result = [];
+    let projects = JSON.parse(localStorage.getItem("projects"));
+    for (let name in projects)
+    {
+        projects[name].name = name;
+        result.push(projects[name]);
+    }
+    return result;
 }
 
 function serialize()
 {
     let serialized = {
-        theme: $settings.theme,
         graph_dimensions: $settings.graph_dimensions,
         settings: $settings.settings,
         models: [],
@@ -56,8 +74,6 @@ function serialize()
 async function deserialize(data)
 {
     $settings = {
-        graph_dimensions: data.graph_dimensions,
-
         LUTs: {},
         plots: {},
         models: {},
@@ -70,6 +86,9 @@ async function deserialize(data)
         sliders: [],
         sliderElement: document.querySelector('#sliders'),
     };
+
+    $settings.graph_dimensions = data.graph_dimensions;
+    shape_selector.value = data.graph_dimensions;
 
     for (let name in data.LUTs)
     {
@@ -92,6 +111,4 @@ async function deserialize(data)
 
     for (let src of data.models)
         add_model(src.code, src.ref);
-
-    set_theme(data.theme);
 }

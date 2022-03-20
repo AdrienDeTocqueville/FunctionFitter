@@ -1,7 +1,7 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera\launcher.exe --allow-file-access-from-files
 
-if (document.cookie)
-    deserialize(JSON.parse(document.cookie));
+if ($projects.length != 0)
+    deserialize($projects[0]);
 else
 {
     function model_f (x, a0, b0, c0, a1, b1, c1)
@@ -65,30 +65,31 @@ else
 
 function generate_dataset(func)
 {
-    let px = null, py = null;
-    let [inputs, resolution, axis_x, axis_y] = generate_parameters();
+    let resolution = 4;
+    let axis1, axis2;
+    let dimensions = $settings.dimensions - 1;
+    let num_sliders = $settings.dimensions - $settings.graph_dimensions;
 
-    if ($settings.graph_dimensions == 2)
-        px = new Array(resolution);
-    else
-        px = new Array(resolution*resolution);
-
+    let px = new Array(Math.pow(resolution, $settings.graph_dimensions-1));
     for (let i = 0; i < px.length; i++)
-        px[i] = new Array(inputs.length);
+        px[i] = new Array(dimensions);
 
-    for (let i = 0; i < inputs.length; i++)
+    for (let i = 0; i < dimensions; i++)
     {
-        if (!Array.isArray(inputs[i]))
+        let param = $settings.parameters[i];
+        if (param.active != -1) // value is from slider
         {
             for (let j = 0; j < px.length; j++)
-                px[j][i] = inputs[i];
+                px[j][i] = param.value;
         }
+        else if (axis1 == undefined) axis1 = i;
+        else if (axis2 == undefined) axis2 = i;
     }
 
     if ($settings.graph_dimensions == 2)
     {
         for (let j = 0; j < resolution; j++)
-            px[j][axis_x] = inputs[axis_x][j];
+            px[j][axis1] = j / (resolution - 1);
     }
     else
     {
@@ -96,12 +97,13 @@ function generate_dataset(func)
         {
             for (let k = 0; k < resolution; k++)
             {
-                px[j*resolution+k][axis_x] = inputs[axis_x][k];
-                px[j*resolution+k][axis_y] = inputs[axis_y][j];
+                px[j*resolution+k][axis1] = k / (resolution - 1);
+                px[j*resolution+k][axis2] = j / (resolution - 1);
             }
         }
     }
 
+    let py = null;
     if (func != undefined)
     {
         py = new Array(px.length);
@@ -109,7 +111,7 @@ function generate_dataset(func)
             py[i] = func(...px[i]);
     }
 
-    return { x_values: px, y_values: py };
+    return { x_values: px, y_values: py, axis1, axis2, resolution };
 }
 
 function fit_function(model, dataset, onstep, onfinish)

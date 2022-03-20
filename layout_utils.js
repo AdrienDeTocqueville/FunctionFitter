@@ -1,4 +1,4 @@
-$settings = {
+var $settings = {
     LUTs: {},
     plots: {},
     models: {},
@@ -10,8 +10,10 @@ $settings = {
     variables: {},
     sliders: [],
     sliderElement: document.querySelector('#sliders'),
-    theme: 0,
 };
+
+document.body.setAttribute('data-theme', localStorage.getItem('theme'));
+
 
 let shape_selector = document.querySelector("#shape-selector");
 shape_selector.onchange = () => {
@@ -48,17 +50,14 @@ function polynom(x)
     return res;
 }
 
-
-function set_theme(idx)
+function set_theme(theme)
 {
-    let themes = ["light-theme", "dark-theme"];
+    let current = document.body.getAttribute('data-theme')
+    if (theme == current) return;
 
-    $settings.theme = idx;
-    document.body.className = themes[idx];
-    document.querySelectorAll("li").forEach(elem => {
-        elem.classList.remove(themes[1-idx]);
-        elem.classList.add(themes[idx]);
-    });
+    theme = theme || (current == 'dark' ? 'light' : 'dark');
+    localStorage.setItem('theme', theme);
+    document.body.setAttribute('data-theme', theme);
 }
 
 /// LISTS
@@ -271,14 +270,6 @@ function parse_parameters(code)
     return parameters;
 }
 
-/*
-function test([a, b], [a0, b0])
-{
-    return 1;
-}
-print(parse_parameters(test.toString()));
-*/
-
 function create_code_editor(code, div, min_line_count, onChange)
 {
     let line_count = Math.min(min_line_count, code.split(/\r\n|\r|\n/).length);
@@ -370,7 +361,7 @@ function add_model(code, ref)
 
         let mse = 0, dataset = get_dataset(ref);
         for (let i = 0; i < dataset.x_values.length; i++)
-            mse += Math.pow(predict(dataset.x_values[i]) - dataset.y_values[i], 2);
+            mse += Math.pow(predict(...dataset.x_values[i]) - dataset.y_values[i], 2);
         mse /= dataset.x_values.length;
 
         let new_label = document.createElement("div");
@@ -381,7 +372,7 @@ function add_model(code, ref)
 
     model.rebuild_model = () => {
         let values = get_variable_values();
-        $settings.plots[fn.name].predict = (x) => fn(x, ...values);
+        $settings.plots[fn.name].predict = (...args) => fn(args, ...values);
         model.refresh_mse();
         refresh_plot(fn.name);
     };
@@ -784,7 +775,7 @@ function get_dataset(name)
     if (plot == null)
         return null;
     if (plot.dataset == null)
-        plot.dataset = generate_dataset(plot.func);
+        plot.dataset = generate_dataset(plot.func || plot.predict);
     return plot.dataset;
 }
 
@@ -827,7 +818,7 @@ function draw_plots()
     {
         let plot = $settings.plots[name];
         if (!plot.display) continue;
-        if (plot.data == null) evaluate_func(plot);
+        if (plot.data == null) evaluate_func(name);
 
         plot.data.name = name;
         traces.push(plot.data);
@@ -842,122 +833,43 @@ function draw_plots()
     })
 }
 
-function generate_parameters()
-{
-    let resolution = 64;
-    let axis_1, axis_2;
-    let num_sliders = $settings.dimensions - $settings.graph_dimensions;
-
-    let inputs = new Array($settings.dimensions - 1);
-    for (let i = 0; i < inputs.length; i++)
-    {
-        let param = $settings.parameters[i];
-        if (param.active != -1)
-            inputs[i] = param.value;
-        else
-        {
-            inputs[i] = new Array(resolution);
-            for (let j = 0; j < resolution; j++)
-                inputs[i][j] = j / (resolution - 1);
-
-            if (axis_1 == undefined) axis_1 = i;
-            else if (axis_2 == undefined) axis_2 = i;
-        }
-    }
-
-    return [inputs, resolution, axis_1, axis_2];
-}
-
 function evaluate_func(plot)
 {
     let trace = null;
-    let [inputs, resolution, axis_x, axis_y] = generate_parameters();
+    let dataset = get_dataset(plot);
 
     if ($settings.graph_dimensions == 2)
     {
         trace = {
             type: "line",
-            x: inputs[axis_x],
-            y: new Array(resolution),
+            x: new Array(dataset.resolution),
+            y: dataset.y_values,
         };
+
+        for (let i = 0; i < dataset.resolution; i++)
+            trace.x[i] = dataset.x_values[i][dataset.axis1];
     }
     else if ($settings.graph_dimensions == 3)
     {
         trace = {
             type: "surface",
-            x: inputs[axis_x],
-            y: inputs[axis_y],
-            z: new Array(resolution),
+            x: new Array(dataset.resolution),
+            y: new Array(dataset.resolution),
+            z: new Array(dataset.resolution),
         };
-    }
 
-    let parameters = new Array(inputs.length);
-    if (plot.predict != null)
-    {
-        for (let i = 0; i < parameters.length; i++)
+        for (let i = 0; i < dataset.resolution; i++)
         {
-            if (!Array.isArray(inputs[i]))
-                parameters[i] = inputs[i];
-        }
+            trace.x[i] = dataset.x_values[i][dataset.axis1];
+            trace.y[i] = dataset.x_values[i*dataset.resolution][dataset.axis2];
 
-        if ($settings.graph_dimensions == 2)
-        {
-            for (let i = 0; i < resolution; i++)
-            {
-                parameters[axis_x] = inputs[axis_x][i];
-                trace.y[i] = plot.predict(parameters);
-            }
-        }
-        else if ($settings.graph_dimensions == 3)
-        {
-            for (let i = 0; i < resolution; i++)
-            {
-                parameters[axis_x] = inputs[axis_x][i];
-
-                let row = new Array(resolution);
-                for (let j = 0; j < resolution; j++)
-                {
-                    parameters[axis_y] = inputs[axis_y][j];
-                    row[j] = plot.predict(parameters);
-                }
-                trace.z[i] = row;
-            }
-        }
-    }
-    else
-    {
-        for (let i = 0; i < parameters.length; i++)
-        {
-            if (!Array.isArray(inputs[i]))
-                parameters[i] = inputs[i];
-        }
-
-        if ($settings.graph_dimensions == 2)
-        {
-            for (let i = 0; i < resolution; i++)
-            {
-                parameters[axis_x] = inputs[axis_x][i];
-                trace.y[i] = plot.func(...parameters);
-            }
-        }
-        else if ($settings.graph_dimensions == 3)
-        {
-            for (let i = 0; i < resolution; i++)
-            {
-                parameters[axis_x] = inputs[axis_x][i];
-
-                let row = new Array(resolution);
-                for (let j = 0; j < resolution; j++)
-                {
-                    parameters[axis_y] = inputs[axis_y][j];
-                    row[j] = plot.func(...parameters);
-                }
-                trace.z[i] = row;
-            }
+            trace.z[i] = new Array(dataset.resolution);
+            for (let j = 0; j < dataset.resolution; j++)
+                trace.z[i][j] = dataset.y_values[j*dataset.resolution + i];
         }
     }
 
-    plot.data = trace;
+    $settings.plots[plot].data = trace;
 }
 
 function sample_lut(name, x, y, channel)
