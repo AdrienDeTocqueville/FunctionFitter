@@ -1,3 +1,110 @@
+/*
+function squared_error(model, dataset, params)
+{
+    let x = dataset.x_values, y = dataset.y_values;
+    let error = 0, m = x.length;
+    for (let i = 0; i < m; i++)
+        error += Math.pow(model(x[i], ...params) - y[i], 2);
+    return error;
+}
+
+function compute_jacobian_numerical(model, dataset, params, predicted, J)
+{
+    const delta = 1e-4;
+    const delta_inv = 1 / delta;
+
+    let x = dataset.x_values;
+    let m = dataset.x_values.length;
+    let n = params.length;
+
+    for (let i = 0; i < m; i++)
+        predicted[i] = model(x[i], ...params);
+
+    for (let j = 0; j < n; j++)
+    {
+        params[j] += delta;
+        for (let i = 0; i < m; i++)
+            J[j * m + i] = (model(x[i], ...params) - predicted[i]) * delta_inv;
+        params[j] -= delta;
+    }
+}
+
+function levenberg_marquardt(model, dataset, params, options = {})
+{
+    const damping = options.damping || 1;
+    const errorTolerance = options.errorTolerance || 1e-7;
+    const maxIterations = options.maxIterations || 100;
+
+    let error = squared_error(model, data, params);
+    let optimalParameters = params.slice();
+
+    let m = dataset.x_values.length, n = params.length;
+
+    let J = new Float32Array(m * n);
+    let JtJ = new Float32Array(n * n);
+    let predicted = new Float32Array(m);
+    let delta = new Float32Array(n);
+
+    for (let i = 0; i < maxIterations && (error > errorTolerance); i++)
+    {
+        {
+            // delta = (JtJ + lambda * I)^-1 * J * (y - predicted)
+
+            // J
+            compute_jacobian_numerical(model, dataset, params, predicted, J);
+
+            // JtJ
+            for (let r = 0; r < n; ++r)
+            {
+                // JtJ is symetric, avoid recomputing values
+                for (let c = 0; c < r; ++c)
+                    JtJ[r * n + c] = JtJ[c * n + r];
+
+                for (let c = r; c < n; ++c)
+                {
+                    let sum = 0;
+                    for (let j = 0; j < m; ++j)
+                        sum += J[r * m + j] * J[c * m + j];
+                    JtJ[r * n + c] = sum;
+                }
+            }
+        }
+
+        //{
+        //    let residualError = matrixFunction(dataset, predicted);
+
+        //    let inverseMatrix = inverse(
+        //        identity.add(
+        //            gradientFunc.mmul(
+        //                gradientFunc.transpose().scale('row', { scale: weights }),
+        //            ),
+        //        ),
+        //    );
+        //}
+
+
+        // Update params & recompute error
+        for (let j = 0; j < params.length; j++)
+            params[j] += delta[j];
+
+        let new_error = squared_error(model, data, params);
+
+        if (new_error < error)
+        {
+            error = new_error;
+            damping = Math.max(damping / 10, 1e-7);
+            for (let j = 0; j < params.length; j++)
+                optimalParameters[j] = params[j];
+        }
+        else
+            damping = Math.min(damping * 10, 1e7);
+    }
+
+    return optimalParameters;
+}
+*/
+
+
 (function () {
     'use strict';
 

@@ -1,4 +1,5 @@
 var $projects = load_project_list();
+var $settings;
 
 print = console.log;
 
@@ -23,17 +24,27 @@ function load_project_list()
     return result;
 }
 
-function serialize()
+function default_settings()
 {
-    let serialized = {
-        graph_dimensions: $settings.graph_dimensions,
-        settings: $settings.settings,
+    return {
+        graph_dimensions: parseInt(shape_selector.value),
+        resolution: resolution_selector.valueAsNumber,
+        settings: [],
         models: [],
         references: [],
         LUTs: {},
         sliders: {},
         variables: {},
     };
+
+}
+
+function serialize()
+{
+    let serialized = default_settings();
+    serialized.graph_dimensions = $settings.graph_dimensions;
+    serialized.resolution = $settings.resolution;
+    serialized.settings = $settings.settings;
 
     for (let name in $settings.models)
     {
@@ -73,7 +84,11 @@ function serialize()
 
 async function deserialize(data)
 {
+    Object.setPrototypeOf(data, default_settings());
+
     $settings = {
+        graph_dimensions: data.graph_dimensions,
+        resolution: data.resolution,
         LUTs: {},
         plots: {},
         models: {},
@@ -87,8 +102,8 @@ async function deserialize(data)
         sliderElement: document.querySelector('#sliders'),
     };
 
-    $settings.graph_dimensions = data.graph_dimensions;
     shape_selector.value = data.graph_dimensions;
+    resolution_selector.value = data.resolution;
 
     for (let name in data.LUTs)
     {
@@ -104,6 +119,7 @@ async function deserialize(data)
 
     for (let src of data.references)
         add_reference(src.code, src.display, false);
+
     refresh_all_plots();
 
     for (let name in data.variables)

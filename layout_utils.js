@@ -1,19 +1,4 @@
-var $settings = {
-    LUTs: {},
-    plots: {},
-    models: {},
-    settings: {},
-    references: [],
-    parameter_names: [],
-    dimensions: undefined,
-    parameters: null,
-    variables: {},
-    sliders: [],
-    sliderElement: document.querySelector('#sliders'),
-};
-
 document.body.setAttribute('data-theme', localStorage.getItem('theme'));
-
 
 let shape_selector = document.querySelector("#shape-selector");
 shape_selector.onchange = () => {
@@ -21,7 +6,12 @@ shape_selector.onchange = () => {
     ensure_sliders();
     refresh_all_plots();
 }
-$settings.graph_dimensions = parseInt(shape_selector.value);
+
+let resolution_selector = document.querySelector("#resolution");
+resolution_selector.onchange = () => {
+    $settings.resolution = resolution_selector.valueAsNumber;
+    refresh_all_plots();
+}
 
 document.querySelector("#switch-theme").onclick = () => set_theme(1 - $settings.theme);
 
@@ -445,7 +435,7 @@ function get_or_create_variable(name, initial_value = undefined)
     {
         variable = { value: initial_value || Math.random() };
 
-        let settings = { label: name, step: 0.00001 }
+        let settings = { label: name, step: 0.001 }
         let [input, label] = create_input("number", null, settings, "variable-" + name, (new_value) => {
             variable.value = new_value;
 
@@ -540,7 +530,7 @@ function generate_sliders(parameters)
         for (let i = 0; i < parameters.length; i++)
         {
             $settings.parameter_names.push(parameters[i]);
-            $settings.parameters.push({ active: -1, value: 0, name: parameters[i], index: i});
+            $settings.parameters.push({ active: -1, value: 0, name: parameters[i], index: i, range: [0, 1]});
         }
     }
     else if ($settings.dimensions != parameters.length + 1)
@@ -628,6 +618,11 @@ function ensure_sliders()
             $settings.sliders[i].active = -1;
             $settings.sliders[i] = $settings.parameters[selected];
             $settings.sliders[i].active = index;
+
+            let element = $settings.sliderElement.childNodes[2*index + 1];
+            element.min = $settings.sliders[i].range[0];
+            element.max = $settings.sliders[i].range[1];
+            element.value = truncate($settings.sliders[i].value, 3);
             refresh_all_plots();
         };
 
@@ -644,9 +639,9 @@ function ensure_sliders()
         slider.className = "form-range";
         slider.type = "range";
         slider.id = "slider-" + i;
-        slider.min = 0;
-        slider.max = 1;
         slider.step = 0.001;
+        slider.min = $settings.sliders[i].range[0];
+        slider.max = $settings.sliders[i].range[1];
         slider.value = value;
         slider.oninput = () => {
             value = truncate(slider.valueAsNumber, 3);
@@ -824,13 +819,42 @@ function draw_plots()
         traces.push(plot.data);
     }
 
+    let param1, param2;
+    for (let i = 0; i < $settings.dimensions - 1; i++)
+    {
+        if ($settings.parameters[i].active == -1)
+        {
+            if (param1 == undefined) param1 = $settings.parameters[i];
+            else if (param2 == undefined) param2 = $settings.parameters[i];
+            else break;
+        }
+    }
+
+    layout = { title: "Main Plot" };
+    if ($settings.graph_dimensions == 2)
+    {
+        layout.xaxis = { range: [param1.range[0]-0.1, param1.range[1]+0.1] };
+        layout.yaxis = { range: [-0.1, 1.1] };
+
+        layout.xaxis.title = { text: $settings.parameter_names[0] };
+    }
+    else
+    {
+        layout.scene = {
+            xaxis: {
+                range: [param1.range[0]-0.1, param1.range[1]+0.1],
+                title: $settings.parameter_names[0],
+            },
+            yaxis: {
+                range: [param2.range[0]-0.1, param2.range[1]+0.1],
+                title: $settings.parameter_names[1],
+            },
+            zaxis: { title: "y", range: [-0.1, 1.1] }, // Y up
+        };
+    }
+
     let div = document.querySelector('#plot');
-    Plotly.react(div, traces, {
-        title: "Main Plot",
-        xaxis: { range: [-0.1, 1.1] },
-        yaxis: { range: [-0.1, 1.1] },
-        zaxis: { range: [-0.1, 1.1] },
-    })
+    Plotly.react(div, traces, layout);
 }
 
 function evaluate_func(plot)
@@ -865,7 +889,7 @@ function evaluate_func(plot)
 
             trace.z[i] = new Array(dataset.resolution);
             for (let j = 0; j < dataset.resolution; j++)
-                trace.z[i][j] = dataset.y_values[j*dataset.resolution + i];
+                trace.z[i][j] = dataset.y_values[i*dataset.resolution + j];
         }
     }
 

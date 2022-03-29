@@ -1,71 +1,9 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera\launcher.exe --allow-file-access-from-files
 
-if ($projects.length != 0)
-    deserialize($projects[0]);
-else
-{
-    function model_f (x, a0, b0, c0, a1, b1, c1)
-    {
-        let [NdotV, roughness] = x;
-        let b = polynom(roughness, a0, b0, c0);
-        let d = polynom(roughness, a1, b1, c1);
-        return polynom(NdotV - 0.74, 0, b, 0, d);
-    }
-    function fgd_ref(NdotV, roughness)
-    {
-        if (TRANSFORM_FGD)
-        {
-            if (FGD_LAYER == 0)
-            {
-                if (roughness < 0.02 && NdotV <= 0.6)
-                    return fgd_lazarov(NdotV, roughness);
-                if (NdotV > 0.6)
-                    return 2*fgd_ref(0.6, roughness) - fgd_ref(0.6-(NdotV-0.6), roughness);
-            }
-            if (FGD_LAYER == 1 && roughness < 0.4 && NdotV < 0.07)
-                return 1;
-        }
-        return sample_lut("FGD", Math.sqrt(NdotV), 1 - roughness, FGD_LAYER);
-    }
-    function fgd_lazarov(NdotV, roughness)
-    {
-        let x = (1-roughness)*(1-roughness);
-        let y = NdotV;
-
-        let b1 = -0.1688;
-        let b2 = 1.895;
-        let b3 = 0.9903;
-        let b4 = -4.853;
-        let b5 = 8.404;
-        let b6 = -5.069;
-        let bias = saturate( Math.min( b1 * x + b2 * x * x, b3 + b4 * y + b5 * y * y + b6 * y * y * y ) );
-
-        let d0 = 0.6045;
-        let d1 = 1.699;
-        let d2 = -0.5228;
-        let d3 = -3.603;
-        let d4 = 1.404;
-        let d5 = 0.1939;
-        let d6 = 2.661;
-        let delta = saturate( d0 + d1 * x + d2 * y + d3 * x * x + d4 * x * y + d5 * y * y + d6 * x * x * x );
-        return [bias, delta, 1][FGD_LAYER];
-    }
-
-    async function main()
-    {
-        await add_lut("FGD_64.png", "FGD");
-        add_setting("TRANSFORM_FGD", "checkbox", true);
-        add_setting("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
-        add_reference(fgd_ref, true);
-        add_reference(fgd_lazarov, false);
-        add_model(model_f);
-    }
-    main()
-}
-
 function generate_dataset(func)
 {
-    let resolution = 4;
+    let resolution = $settings.resolution;
+
     let axis1, axis2;
     let dimensions = $settings.dimensions - 1;
     let num_sliders = $settings.dimensions - $settings.graph_dimensions;
@@ -86,19 +24,25 @@ function generate_dataset(func)
         else if (axis2 == undefined) axis2 = i;
     }
 
+    let param1 = $settings.parameters[axis1];
+    let param2 = $settings.parameters[axis2];
+
     if ($settings.graph_dimensions == 2)
     {
+        let offset = param1.range[0], range = param1.range[1] - param1.range[0];
         for (let j = 0; j < resolution; j++)
-            px[j][axis1] = j / (resolution - 1);
+            px[j][axis1] = offset + range * j / (resolution - 1);
     }
     else
     {
+        let offset1 = param1.range[0], range1 = param1.range[1] - param1.range[0];
+        let offset2 = param2.range[0], range2 = param2.range[1] - param2.range[0];
         for (let j = 0; j < resolution; j++)
         {
             for (let k = 0; k < resolution; k++)
             {
-                px[j*resolution+k][axis1] = k / (resolution - 1);
-                px[j*resolution+k][axis2] = j / (resolution - 1);
+                px[j*resolution+k][axis1] = offset1 + range1 * k / (resolution - 1);
+                px[j*resolution+k][axis2] = offset2 + range2 * j / (resolution - 1);
             }
         }
     }
