@@ -1,7 +1,5 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera\launcher.exe --allow-file-access-from-files
 
-deserialize({});
-
 // HLSL EMULATION
 function rcp(x) { return 1 / x; }
 function float2(x, y) { return {x, y}; }
@@ -12,11 +10,13 @@ function add(a, b) { return float3(a.x+b.x, a.y+b.y, a.z+b.z); }
 function sub(a, b) { return float3(a.x-b.x, a.y-b.y, a.z-b.z); }
 // END HLSL
 
-function model_f (input, l, a, b, c, d)
+function model_f (input, l, o, s)
 {
     let [x, z] = input;
-    let num = polynom(z, a, b, c);
-    return saturate(num / (d + Math.pow(l*l + z*z, 2)));
+    z *= s;
+    return saturate(l*z / Math.pow(l*l + z*z + o, 2));
+    //let num = polynom(z, a, b, c);
+    //return saturate(num / (d + Math.pow(l*l + z*z, 2)));
 }
 
 function ReverseBits32(bits)
@@ -107,20 +107,24 @@ function area_light(x, z)
 
 function area_light_weighted(x, z)
 {
-    let ref = area_light(0, z);
-    return ref > 0 ? area_light(x, z) / ref : 1;
+    z *= S;
+    return L*z / Math.pow(L*L + z*z + O, 2);
+
 }
 
 
 add_setting("DIFFUSE_SCALE", "number", 100);
 add_setting("LIGHT_HEIGHT", "number", 1);
 add_setting("LIGHT_WIDTH", "number", 2);
+add_setting("L", "range", 0.2, {min: 0, max: 1.5, step: 0.05});
+add_setting("O", "range", 0.0, {min: 0, max: 3, step: 0.05});
+add_setting("S", "range", 1, {min: 0, max: 3, step: 0.05});
 add_reference(area_light, true);
 add_reference(area_light_weighted, true);
 
 // TODO: find a way to do that properly
-$settings.parameters[0].range = [-5, 5];
+$settings.parameters[0].range = [0, 5];
 $settings.parameters[1].range = [-1, 4];
-refresh_all_plots();
+rebuild_ranges();
 
-//add_model(model_f);
+add_model(model_f);

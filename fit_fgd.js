@@ -1,6 +1,4 @@
-if ($projects.length != 0)
-    deserialize($projects[0]);
-else
+if (!deserialize($projects["FGD"])
 {
     deserialize({});
 

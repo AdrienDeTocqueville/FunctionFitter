@@ -188,15 +188,15 @@ function levenberg_marquardt(model, dataset, params, options = {})
             }
 
             // Check termination condition
-            if ((iter % options.update_period) === 0)
-            {
-                let sse = squared_error(model, dataset, x0);
-                if (Math.abs(1 - sse / lastError) < options.min_error) {
-                    break;
-                }
-                lastError = sse;
-                self.postMessage({type: "onstep", name: model.name, payload: x0});
-            }
+            //if ((iter % options.update_period) === 0)
+            //{
+            //    let sse = squared_error(model, dataset, x0);
+            //    if (Math.abs(1 - sse / lastError) < options.min_error) {
+            //        break;
+            //    }
+            //    lastError = sse;
+            //    self.postMessage({type: "onstep", name: model.name, payload: x0});
+            //}
         }
 
         //I added the following 'R^2' like calculation.

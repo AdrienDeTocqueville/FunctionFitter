@@ -17,7 +17,7 @@
     <header>
         <div id="left" class="header-list">
             <i class="fa-solid fa-bars"></i>
-            <i id="project-name">FGD</i>
+            <i id="project-name"></i>
             <i class="fa-solid fa-floppy-disk" id="save"></i>
         </div>
         <a><strong>Function Fitter</strong></a>
@@ -26,7 +26,21 @@
         </div>
     </header>
 
-    <main style="display: flex; flex-direction: row">
+    <nav id="drawer">
+        <div class="single-line">
+            <i class="fa-solid fa-plus" style="font-size: 18px; padding: 4px 4px 0 0"></i>
+            <i>New empty project</i>
+        </div>
+        <br/>
+
+        <h5>Local Projects</h5>
+        <br/>
+
+        <ul id="projects">
+        </ul>
+    </nav>
+
+    <main class="single-line">
 
         <div class="pannel" id="controls">
             <h3>Sliders</h3>
@@ -42,10 +56,10 @@
         <div class="pannel" id="plots" style="">
 
             <br/>
-            <div style="display: flex; flex-direction: row; justify-content: space-around; padding-bottom: 4px;">
+            <div class = "single-line" style="justify-content: space-around; padding-bottom: 4px;">
                 <select class="form-select form-select-sm" id="shape-selector" style="width: 200px">
-                    <option value="2">2D Graph</option>
-                    <option value="3" selected>3D Surface</option>
+                    <option value="2" selected>2D Graph</option>
+                    <option value="3">3D Surface</option>
                 </select>
                 <div style="display: flex">
                     <label style="margin-right: 10px; font-size: 19px" for="resolution">Resolution</label>
@@ -82,16 +96,27 @@
 			<ul id="reference_list"> </ul>
 		</div>
 
+        <div id="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <br/>
+                <h5>Rename Project</h5>
+                <div class="single-line" style="margin-top:10px">
+                    <input class="form-control" type="text"></input>
+                    <button class="btn btn-success">Save</button>
+                </div>
+            </div>
+        </div>
 
 	</main>
 
     <script src="split.js"></script>
 
-    <script src="data_model.js" defer></script>
     <script src="layout_utils.js" defer></script>
+    <script src="data_model.js" defer></script>
     <script src="fit_function.js" defer></script>
 
-    <script src="fit_fgd.js" defer></script>
+    <script src="fit_area.js" defer></script>
 </body>
 
 </html>

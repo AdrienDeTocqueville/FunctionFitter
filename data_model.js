@@ -1,42 +1,62 @@
-var $projects = load_project_list();
-var $settings;
+var $settings, $projects = load_projects();
+var print = console.log;
+let loaded_project = null;
 
-print = console.log;
+set_theme(localStorage.getItem('theme'));
+deserialize({});
+
+// Modal
+document.querySelector("#project-name").onclick = () => {
+    open_modal();
+}
+document.querySelector("#modal button").onclick = () => {
+    loaded_project = document.querySelector("#modal input").value;
+    document.querySelector("#project-name").innerText = loaded_project;
+    close_modal();
+};
 
 document.querySelector("#save").onclick = () => {
-    let name = document.querySelector("#project-name").innerText;
-    let projects = localStorage.getItem("projects");
-    projects = projects ? JSON.parse(projects) : {}
-    projects[name] = serialize();
-
-    localStorage.setItem("projects", JSON.stringify(projects));
+    if (loaded_project == null) return open_modal();
+    $projects[loaded_project] = serialize();
+    save_projects();
 }
 
-function load_project_list()
+// Theme
+document.querySelector("#switch-theme").onclick = () => set_theme(1 - $settings.theme);
+
+// Serialization
+function load_projects()
+{
+    let result = {};
+    let projects = JSON.parse(localStorage.getItem("projects"));
+    if (projects != null)
+        for (let proj of projects)
+            result[proj.name] = proj;
+    return result;
+}
+function save_projects()
 {
     let result = [];
-    let projects = JSON.parse(localStorage.getItem("projects"));
-    for (let name in projects)
+    for (let name in $projects)
     {
-        projects[name].name = name;
-        result.push(projects[name]);
+        $projects[name].name = name;
+        result.push($projects[name]);
     }
-    return result;
+    localStorage.setItem("projects", JSON.stringify(result));
 }
 
 function default_settings()
 {
     return {
-        graph_dimensions: parseInt(shape_selector.value),
-        resolution: resolution_selector.valueAsNumber,
+        graph_dimensions: 2,
+        resolution: 64,
         settings: [],
         models: [],
         references: [],
         LUTs: {},
-        sliders: {},
+        parameters: {},
         variables: {},
     };
-
 }
 
 function serialize()
@@ -73,8 +93,12 @@ function serialize()
         };
     }
 
-    for (let src of $settings.sliders)
-        serialized.sliders[src.name] = src.value;
+    for (let src of $settings.parameters)
+        serialized.parameters[src.name] = {
+            value: src.value,
+            range: src.range,
+            resolution: src.resolution
+        };
 
     for (let name in $settings.variables)
         serialized.variables[name] = $settings.variables[name].value;
@@ -82,9 +106,19 @@ function serialize()
     return serialized;
 }
 
-async function deserialize(data)
+function deserialize(data)
 {
     Object.setPrototypeOf(data, default_settings());
+
+    loaded_project = data.name;
+
+    // Unload current project
+
+    document.querySelector("#sliders").innerHTML = "";
+    document.querySelector("#variable_list").innerHTML = "";
+    document.querySelector("#lut_list").innerHTML = "";
+    document.querySelector("#model_list").innerHTML = "";
+    document.querySelector("#reference_list").innerHTML = "";
 
     $settings = {
         graph_dimensions: data.graph_dimensions,
@@ -102,13 +136,16 @@ async function deserialize(data)
         sliderElement: document.querySelector('#sliders'),
     };
 
+    // Load
+
+    document.querySelector("#project-name").innerText = loaded_project || "Unnamed Project";
     shape_selector.value = data.graph_dimensions;
     resolution_selector.value = data.resolution;
 
     for (let name in data.LUTs)
     {
         let src = data.LUTs[name];
-        await add_lut(src.url, name, src.bilinear);
+        add_lut(src.url, name, src.bilinear);
     }
 
     for (let name in data.settings)
@@ -120,11 +157,24 @@ async function deserialize(data)
     for (let src of data.references)
         add_reference(src.code, src.display, false);
 
-    refresh_all_plots();
-
     for (let name in data.variables)
         get_or_create_variable(name, data.variables[name]);
 
     for (let src of data.models)
         add_model(src.code, src.ref);
+
+    for (let name in data.parameters)
+    {
+        for (let param of $settings.parameters)
+        {
+            if (param.name == name)
+            {
+                param.value = data.parameters[name].value;
+                param.range = data.parameters[name].range;
+                param.resolution = data.parameters[name].resolution;
+            }
+        }
+    }
+
+    rebuild_ranges();
 }
