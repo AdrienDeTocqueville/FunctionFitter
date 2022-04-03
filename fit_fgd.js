@@ -1,4 +1,4 @@
-if (!deserialize($projects["FGD"])
+if (!deserialize($projects["FGD"]))
 {
     deserialize({});
 

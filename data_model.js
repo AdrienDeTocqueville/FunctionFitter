@@ -1,24 +1,47 @@
-var $settings, $projects = load_projects();
+var $settings, $projects;
 var print = console.log;
 let loaded_project = null;
+
+$projects = load_projects();
+refresh_project_list();
 
 set_theme(localStorage.getItem('theme'));
 deserialize({});
 
 // Modal
 document.querySelector("#project-name").onclick = () => {
-    open_modal();
+    document.querySelector("#modal input").value = loaded_project || "";
+    let previous_name = loaded_project;
+    open_modal(() => {
+        if ($projects[previous_name])
+        {
+            $projects[loaded_project] = $projects[previous_name];
+            delete $projects[previous_name];
+            save_projects();
+        }
+    });
+    document.querySelector("#modal input").focus();
 }
+document.querySelector("#modal input").onkeyup = (e) => {
+    if (e.key == "Enter")  document.querySelector("#modal button").click();
+    if (e.key == "Escape") document.querySelector("#modal .close").click();
+};
 document.querySelector("#modal button").onclick = () => {
-    loaded_project = document.querySelector("#modal input").value;
-    document.querySelector("#project-name").innerText = loaded_project;
+    let name = document.querySelector("#modal input").value;
+    document.querySelector("#modal input").value = "";
+    if (/^\s*$/.test(name)) return; // empty
+    document.querySelector("#project-name").innerText = loaded_project = name;
     close_modal();
 };
 
 document.querySelector("#save").onclick = () => {
-    if (loaded_project == null) return open_modal();
-    $projects[loaded_project] = serialize();
-    save_projects();
+    if (loaded_project == null)
+    {
+        open_modal(save_project);
+        document.querySelector("#modal input").focus();
+    }
+    else
+        save_project();
 }
 
 // Theme
@@ -43,6 +66,20 @@ function save_projects()
         result.push($projects[name]);
     }
     localStorage.setItem("projects", JSON.stringify(result));
+    refresh_project_list();
+}
+function save_project()
+{
+    $projects[loaded_project] = serialize();
+    save_projects();
+}
+function delete_project(name)
+{
+    delete $projects[name];
+    if (name == loaded_project)
+        deserialize({});
+
+    save_projects();
 }
 
 function default_settings()
@@ -93,12 +130,15 @@ function serialize()
         };
     }
 
-    for (let src of $settings.parameters)
-        serialized.parameters[src.name] = {
-            value: src.value,
-            range: src.range,
-            resolution: src.resolution
-        };
+    if ($settings.parameters)
+    {
+        for (let src of $settings.parameters)
+            serialized.parameters[src.name] = {
+                value: src.value,
+                range: src.range,
+                resolution: src.resolution
+            };
+    }
 
     for (let name in $settings.variables)
         serialized.variables[name] = $settings.variables[name].value;
@@ -108,6 +148,7 @@ function serialize()
 
 function deserialize(data)
 {
+    data = data || {};
     Object.setPrototypeOf(data, default_settings());
 
     loaded_project = data.name;
@@ -117,8 +158,17 @@ function deserialize(data)
     document.querySelector("#sliders").innerHTML = "";
     document.querySelector("#variable_list").innerHTML = "";
     document.querySelector("#lut_list").innerHTML = "";
+    document.querySelector("#settings_list").innerHTML = "";
     document.querySelector("#model_list").innerHTML = "";
     document.querySelector("#reference_list").innerHTML = "";
+
+    if ($settings)
+    {
+        for (let name in $settings.settings)
+            delete window[name];
+        for (let name in $settings.plots)
+            delete window[name];
+    }
 
     $settings = {
         graph_dimensions: data.graph_dimensions,
@@ -130,7 +180,7 @@ function deserialize(data)
         references: [],
         parameter_names: [],
         dimensions: undefined,
-        parameters: null,
+        parameters: undefined,
         variables: {},
         sliders: [],
         sliderElement: document.querySelector('#sliders'),
@@ -163,15 +213,18 @@ function deserialize(data)
     for (let src of data.models)
         add_model(src.code, src.ref);
 
-    for (let name in data.parameters)
+    if ($settings.parameters != undefined)
     {
-        for (let param of $settings.parameters)
+        for (let name in data.parameters)
         {
-            if (param.name == name)
+            for (let param of $settings.parameters)
             {
-                param.value = data.parameters[name].value;
-                param.range = data.parameters[name].range;
-                param.resolution = data.parameters[name].resolution;
+                if (param.name == name)
+                {
+                    param.value = data.parameters[name].value;
+                    param.range = data.parameters[name].range;
+                    param.resolution = data.parameters[name].resolution;
+                }
             }
         }
     }

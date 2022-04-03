@@ -49,10 +49,10 @@ function add_list_element(list, style, children, on_delete)
 
     if (on_delete != null)
     {
-        let delete_button = document.createElement("button");
-        delete_button.className = "btn-close";
-        delete_button.type = "button";
-        delete_button.onclick = on_delete;
+        let delete_button = document.createElement("span");
+        delete_button.className = "close";
+        delete_button.innerHTML = "&times;";
+        delete_button.onclick = () => on_delete(li);
 
         li.appendChild(delete_button);
     }
@@ -126,10 +126,10 @@ function load_lut_async(url, name, canvas)
 
             context.clearRect(0, 0, img.width, img.height);
             context.drawImage(img, 0, 0);
-            data.image = context.getImageData(0, 0, img.width, img.height); 
+            $settings.LUTs[name].image = context.getImageData(0, 0, img.width, img.height); 
 
             refresh_all_plots();
-            resolve(data);
+            resolve($settings.LUTs[name]);
         };
         img.onerror = reject;
         img.src = url;
@@ -246,10 +246,6 @@ function add_setting(name, type, initial_value, settings = {})
     if (window[name] != undefined)
         return;
 
-    window[name] = initial_value;
-
-    $settings.settings[name] = { type, initial_value, settings: {...settings} };
-
     settings.label = name;
 
     let [input, label] = create_input(type, initial_value, settings, "settings-" + name, (value) => {
@@ -259,7 +255,14 @@ function add_setting(name, type, initial_value, settings = {})
 
     label.style = "margin-right: 30px";
 
-    add_list_element('#settings_list', "display: flex; flex-direction: row", [label, input]);
+    window[name] = initial_value;
+    $settings.settings[name] = { type, initial_value, settings: {...settings} };
+
+    add_list_element('#settings_list', "display: flex; flex-direction: row", [label, input], (li) => {
+        delete $settings.settings[name];
+        delete window[name];
+        li.remove();
+    });
 }
 
 
@@ -861,20 +864,45 @@ function evaluate_func(plot)
 
 /// Project Drawer
 
-document.querySelector("header .fa-bars").onclick = () => {
-    if (this.drawer_opened)
+function refresh_project_list()
+{
+    document.querySelector("#project_list").innerHTML = "";
+    for (let name in $projects)
     {
-        this.drawer_opened = false;
-        document.querySelector("#drawer").removeAttribute('project-drawer');
-        document.querySelector("main").removeAttribute('project-drawer');
+        let div = document.createElement("div");
+        div.innerText = name;
+        div.onclick = () => {
+            deserialize($projects[name]);
+            set_project_drawer(false);
+        };
+        add_list_element('#project_list', "", [div], () => {
+            delete_project(name);
+        });
     }
-    else
+}
+
+function set_project_drawer(open)
+{
+    current = this.drawer_opened || false;
+    if ((arguments.length == 0 ? !current : open))
     {
         this.drawer_opened = true;
         document.querySelector("#drawer").setAttribute('project-drawer', 'opened');
         document.querySelector("main").setAttribute('project-drawer', 'opened');
     }
-};
+    else
+    {
+        this.drawer_opened = false;
+        document.querySelector("#drawer").removeAttribute('project-drawer');
+        document.querySelector("main").removeAttribute('project-drawer');
+    }
+}
+
+document.querySelector("header .fa-bars").onclick = () => set_project_drawer();
+document.querySelector("#new-project").onclick = () => {
+    deserialize({});
+    set_project_drawer(false);
+}
 
 /// Misc.
 
@@ -888,9 +916,18 @@ function set_theme(theme)
     document.body.setAttribute('data-theme', theme);
 }
 
-let open_modal = () => document.querySelector("#modal").style.display = "block";
-let close_modal = () => document.querySelector("#modal").style.display = "none";
-document.querySelector("#modal .close").onclick = close_modal;
+let modal = document.querySelector("#modal");
+let modal_callback = null;
+let open_modal = (callback) => {
+    modal.style.display = "block";
+    modal_callback = callback;
+}
+let close_modal = (callback) => {
+    modal.style.display = "none";
+    if (modal_callback != null) modal_callback();
+}
+
+document.querySelector("#modal .close").onclick = () => { modal.style.display = "none"; };
 
 function create_input(type, value, settings, id, onChange)
 {

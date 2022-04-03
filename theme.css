@@ -81,22 +81,37 @@ h3 { position: relative; }
     font-size: large;
 }
 
-.deletable-list .btn-close
+.deletable-list .close
 {
     position: absolute;
-    right: -4px;
-    top: -4px;
-    width: 4px;
-    height: 4px;
+    right: -1px;
+    top: -12px;
+    font-size: 20px;
     display: none;
 }
-.deletable-list:hover .btn-close { display: block; }
+.deletable-list:hover .close { display: block; }
 
 /* Misc. */
 
 .single-line { display: flex; flex-direction: row; }
 .lut-canvas:hover { filter: brightness(70%); }
 #sliders form input { width: 20%; height: 1.5rem; }
+
+.close
+{
+    color: #aaaaaa;
+    position: absolute;
+    top: 0px;
+    right: 10px;
+    font-size: 30px;
+    font-weight: bold;
+}
+.close:hover, .close:focus
+{
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
+}
 
 /* Modal */
 
@@ -125,21 +140,12 @@ h3 { position: relative; }
     width: 486px;
 }
 
-#modal button {
+#modal button
+{
     padding-left: 15px;
     padding-right: 15px;
     margin-left: 10px;
 }
-#modal .close
-{
-    color: #aaaaaa;
-    position: absolute;
-    top: 0px;
-    right: 10px;
-    font-size: 30px;
-    font-weight: bold;
-}
-#modal .close:hover, #modal .close:focus { color: #000; text-decoration: none; cursor: pointer; }
 
 /* Drawer */
 
@@ -159,14 +165,17 @@ h3 { position: relative; }
     color: white;
 }
 
-#drawer ul {
-padding-left: 0;
-}
+#drawer ul { padding-left: 0; }
 
-#drawer li {
+#drawer li
+{
     background-color: #24292E;
     border-color: #999999 !important;
+    color: white;
+    cursor: pointer
 }
+
+#drawer .close:hover { color: white; }
 
 #drawer[project-drawer="opened"] { left: 0px; }
 main[project-drawer="opened"] { transform: translate(300px, 0px); }
