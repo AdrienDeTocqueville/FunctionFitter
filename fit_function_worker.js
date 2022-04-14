@@ -163,7 +163,7 @@ function levenberg_marquardt(model, dataset, params, options = {})
 
     // Non linear least squares implementation
     // https://github.com/adussaq/amd_cf
-    function lstsq({model, initial_values, dataset}, options)
+    function lstsq(model, initial_values, dataset, options)
     {
         let x0 = initial_values;
         let x1 = initial_values.splice();
@@ -195,7 +195,7 @@ function levenberg_marquardt(model, dataset, params, options = {})
             //        break;
             //    }
             //    lastError = sse;
-            //    self.postMessage({type: "onstep", name: model.name, payload: x0});
+            //    options.onstep(model.name, x0);
             //}
         }
 
@@ -218,26 +218,59 @@ function levenberg_marquardt(model, dataset, params, options = {})
         };
     }
 
-    self.onmessage = function (event) {
-
-        let data = {
-            model: eval("(" + event.data.model + ")"),
-            initial_values: event.data.parameters,
-            dataset: event.data.dataset,
-        }
-
-        //variable declarations
+    function fit_function(model, initial_values, dataset, onstep)
+    {
         let options = {
-            step: [...new Array(data.initial_values.length)].fill(1 / 100),
+            step: [...new Array(initial_values.length)].fill(1 / 100),
             max_iteration: 1000,
             min_error: 1e-6,
             update_period: 50,
             converge: 1.2,
-            diverge: -0.5
+            diverge: -0.5,
+            onstep,
         };
 
-        let result = lstsq(data, options);
-        self.postMessage({type: "onfinish", name: data.model.name, payload: result.parameters});
+        if (onstep == null) options.update_period = options.maxIterations;
+
+        return lstsq(model, initial_values, dataset, options);
+    }
+
+    self.onmessage = function (event)
+    {
+        for (let name in event.data.globals)
+        {
+            let value = event.data.globals[name];
+            if (typeof value == "string")
+                self[name] = eval("(" + value + ")");
+            else
+                self[name] = value;
+        }
+
+        let model = eval("(" + event.data.model + ")");
+        let initial_values = event.data.parameters;
+        let dataset = event.data.dataset;
+
+        let onstep = (name, payload) => {
+            self.postMessage({type: "onstep", name, payload});
+        };
+
+        let result = fit_function(model, initial_values, dataset, onstep);
+        self.postMessage({
+            type: "onfinish",
+            name: model.name,
+            payload: result.parameters
+        });
     };
+
+    if (typeof WorkerGlobalScope === 'undefined')
+        window.fit_function_sync = (model, dataset, onstep) =>
+        {
+            let values = new Array(model.variables.length);
+            for (let i = 0; i < model.variables.length; i++)
+                values[i] = model.variables[i].value;
+
+            return fit_function(model.func, values, dataset, onstep);
+        };
+
 
 }());

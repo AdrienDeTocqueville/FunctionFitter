@@ -331,6 +331,7 @@ function add_model(code, ref)
         return values;
     }
 
+    window[fn.name] = fn;
     let model = { func: fn, variables, ref };
     $settings.models[fn.name] = model;
     $settings.plots[fn.name] = { data: null, display: true, parameters };
@@ -396,9 +397,7 @@ function add_model(code, ref)
             return onfinish();
 
         button.innerText = "...";
-
-        let ref = $settings.references[target_input.value];
-        fit_function(model, get_dataset(ref), onstep, onfinish);
+        fit_function(model, get_dataset(model.ref), onstep, onfinish);
     };
     let onstep = () => {
     };
@@ -454,7 +453,7 @@ function get_or_create_variable(name, initial_value = undefined)
     let variable = $settings.variables[name];
     if (variable == null)
     {
-        variable = { value: initial_value || Math.random() };
+        variable = { value: initial_value || Math.random(), name };
 
         let settings = { label: name, step: 0.001 }
         let [input, label] = create_input("number", null, settings, "variable-" + name, (new_value) => {
@@ -780,7 +779,7 @@ function draw_plots()
     if ($settings.dimensions == undefined)
         return;
 
-    traces = [];
+    let traces = [];
     for (let name in $settings.plots)
     {
         let plot = $settings.plots[name];
@@ -804,7 +803,7 @@ function draw_plots()
 
     let make_axis = (text, range) => ({ range: [range[0]-0.1, range[1]+0.1], title: {text} });
 
-    layout = { title: "Main Plot" };
+    let layout = { title: "Main Plot" };
     if ($settings.graph_dimensions == 2)
     {
         layout.xaxis = make_axis(param1.name, param1.range);

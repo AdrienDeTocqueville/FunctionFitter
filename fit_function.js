@@ -83,9 +83,15 @@ function fit_function(model, dataset, onstep, onfinish)
         };
     }
 
-    let values = new Array(model.variables.length);
+    let parameters = new Array(model.variables.length);
     for (let i = 0; i < model.variables.length; i++)
-        values[i] = model.variables[i].value;
+        parameters[i] = model.variables[i].value;
+
+    let globals = {};
+    for (let name in $settings.settings)
+        globals[name] = window[name];
+    for (let name in $settings.plots)
+        globals[name] = window[name].toString();
 
     let job = {
         model,
@@ -93,12 +99,6 @@ function fit_function(model, dataset, onstep, onfinish)
         onfinish,
     }
 
-    let job_data = {
-        model: model.func.toString(),
-        parameters: values,
-        dataset,
-    };
-
     this.jobs[model.func.name] = job;
-    this.worker.postMessage(job_data);
+    this.worker.postMessage({ model: model.func.toString(), parameters, dataset, globals });
 }

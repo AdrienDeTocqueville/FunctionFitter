@@ -178,5 +178,5 @@ h3 { position: relative; }
 #drawer .close:hover { color: white; }
 
 #drawer[project-drawer="opened"] { left: 0px; }
-main[project-drawer="opened"] { transform: translate(300px, 0px); }
+main[project-drawer="opened"] { transform: translate(300px, 0px); overflow-x: hidden; }
 main { transition: transform .5s; }
