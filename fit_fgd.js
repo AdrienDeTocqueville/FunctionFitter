@@ -23,7 +23,7 @@ if (!deserialize($projects["FGD"]))
             if (FGD_LAYER == 1 && roughness < 0.4 && NdotV < 0.07)
                 return 1;
         }
-        return sample_lut("FGD", Math.sqrt(NdotV), 1 - roughness, FGD_LAYER);
+        return FGD_LUT(Math.sqrt(NdotV), 1 - roughness, FGD_LAYER);
     }
     function fgd_lazarov(NdotV, roughness)
     {
@@ -51,7 +51,7 @@ if (!deserialize($projects["FGD"]))
 
     async function main()
     {
-        await add_lut("FGD_64.png", "FGD");
+        await add_lut("FGD_LUT", "FGD_64.png");
         add_setting("TRANSFORM_FGD", "checkbox", true);
         add_setting("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
         add_reference(fgd_ref, true);

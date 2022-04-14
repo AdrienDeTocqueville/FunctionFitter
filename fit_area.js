@@ -19,6 +19,14 @@ function model_f (input, l, o, s)
     //return saturate(num / (d + Math.pow(l*l + z*z, 2)));
 }
 
+function model_2d(input, l, s, d)
+{
+    let [x, z] = input;
+
+    let res = l * z / Math.pow(l*l + (z-d)*(z-d)*s, 2);
+    return Math.max(res, 0);
+}
+
 function ReverseBits32(bits)
 {
     bits = (bits << 16) | (bits >>> 16);
@@ -128,3 +136,4 @@ $settings.parameters[1].range = [-1, 4];
 rebuild_ranges();
 
 add_model(model_f);
+add_model(model_2d);

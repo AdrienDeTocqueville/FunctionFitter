@@ -50,7 +50,7 @@
             <h3> Variables
                 <i class="header-button fa-solid fa-pen-to-square" style="padding-top: 10px" id="edit_variables"></i>
             </h3>
-			<ul id="variable_list"> </ul>
+            <ul id="variable_list"> </ul>
         </div>
 
         <div class="pannel" id="plots" style="">
@@ -67,17 +67,11 @@
                 </div>
             </div>
 
-			<div id="plot"></div>
+            <div id="plot"></div>
 
-		</div>
+        </div>
 
-		<div class="pannel" id="settings">
-			<h3>LUTs
-				<button type="button" class="btn btn-outline-secondary header-button" id="add_lut">+</button>
-			</h3>
-			<ul id="lut_list"> </ul>
-
-            <hr/>
+        <div class="pannel" id="settings">
             <h3>Settings
                 <button type="button" class="btn btn-outline-secondary header-button" id="add_var">+</button>
             </h3>
@@ -93,10 +87,10 @@
             <h3>References
                 <button type="button" class="btn btn-outline-secondary header-button" id="add_ref">+</button>
             </h3>
-			<ul id="reference_list"> </ul>
-		</div>
+            <ul id="reference_list"> </ul>
+        </div>
 
-        <div id="modal">
+        <div id="modal" onclick="if (this == event.path[0]) close_modal()">
             <div class="modal-content">
                 <span class="close">&times;</span>
                 <br/>
@@ -108,7 +102,7 @@
             </div>
         </div>
 
-	</main>
+    </main>
 
     <script src="split.js"></script>
 

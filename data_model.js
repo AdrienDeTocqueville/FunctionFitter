@@ -87,10 +87,9 @@ function default_settings()
     return {
         graph_dimensions: 2,
         resolution: 64,
-        settings: [],
+        settings: {},
         models: [],
         references: [],
-        LUTs: {},
         parameters: {},
         variables: {},
     };
@@ -121,13 +120,21 @@ function serialize()
         });
     }
 
-    for (let name in $settings.LUTs)
+    for (let name in $settings.settings)
     {
-        let src = $settings.LUTs[name];
-        serialized.LUTs[name] = {
-            bilinear: src.bilinear,
-            url: src.url,
-        };
+        let src = $settings.settings[name];
+        if (src.type == 'lut')
+        {
+            serialized.settings[name] = {
+                type: src.type,
+                bilinear: src.settings.bilinear,
+                url: src.settings.url,
+            };
+        }
+        else
+        {
+            serialized.settings[name] = src;
+        }
     }
 
     if ($settings.parameters)
@@ -157,7 +164,6 @@ function deserialize(data)
 
     document.querySelector("#sliders").innerHTML = "";
     document.querySelector("#variable_list").innerHTML = "";
-    document.querySelector("#lut_list").innerHTML = "";
     document.querySelector("#settings_list").innerHTML = "";
     document.querySelector("#model_list").innerHTML = "";
     document.querySelector("#reference_list").innerHTML = "";
@@ -173,7 +179,6 @@ function deserialize(data)
     $settings = {
         graph_dimensions: data.graph_dimensions,
         resolution: data.resolution,
-        LUTs: {},
         plots: {},
         models: {},
         settings: {},
@@ -192,16 +197,11 @@ function deserialize(data)
     shape_selector.value = data.graph_dimensions;
     resolution_selector.value = data.resolution;
 
-    for (let name in data.LUTs)
-    {
-        let src = data.LUTs[name];
-        add_lut(src.url, name, src.bilinear);
-    }
-
     for (let name in data.settings)
     {
         let src = data.settings[name];
-        add_setting(name, src.type, src.initial_value, src.settings);
+        if (src.type == 'lut') add_lut(name, src.url, src.bilinear);
+        else add_setting(name, src.type, src.initial_value, src.settings);
     }
 
     for (let src of data.references)

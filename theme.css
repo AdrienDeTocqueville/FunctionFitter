@@ -104,7 +104,6 @@ h3 { position: relative; }
     top: 0px;
     right: 10px;
     font-size: 30px;
-    font-weight: bold;
 }
 .close:hover, .close:focus
 {
@@ -150,16 +149,16 @@ h3 { position: relative; }
 /* Drawer */
 
 #drawer
-{ 
-    position: fixed; 
-    top: 0; 
-    left:-300px; 
-    height: 100%; 
-    width: 300px; 
+{
+    position: fixed;
+    top: 0;
+    left:-300px;
+    height: 100%;
+    width: 300px;
     background-color: #24292E;
-    overflow-x: hidden; 
-    overflow-y: scroll; 
-    padding: 20px; 
+    overflow-x: hidden;
+    overflow-y: scroll;
+    padding: 20px;
     transition: left .5s;
     margin-top: 3em;
     color: white;

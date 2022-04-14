@@ -62,9 +62,6 @@ function add_list_element(list, style, children, on_delete)
 
 function hook_add_buttons()
 {
-    document.querySelector("#add_lut").onclick = () => {
-        add_lut(null, "new_lut");
-    }
     document.querySelector("#add_ref").onclick = () => {
         add_reference(default_func, false);
     }
@@ -126,17 +123,17 @@ function load_lut_async(url, name, canvas)
 
             context.clearRect(0, 0, img.width, img.height);
             context.drawImage(img, 0, 0);
-            $settings.LUTs[name].image = context.getImageData(0, 0, img.width, img.height); 
+            $settings.settings[name].image = context.getImageData(0, 0, img.width, img.height);
 
             refresh_all_plots();
-            resolve($settings.LUTs[name]);
+            resolve($settings.settings[name]);
         };
         img.onerror = reject;
         img.src = url;
     });
 }
 
-function add_lut(url, name, bilinear = true)
+function add_lut(name, url, bilinear = true)
 {
     if (name == null)
         name = url.replace(/\.[^/.]+$/, "");
@@ -163,43 +160,15 @@ function add_lut(url, name, bilinear = true)
         }
     }
 
-    let input = document.createElement("input");
-    input.style = "height:25px; width: 100%";
-    input.className = "form-control";
-    input.value = name;
-    input.type = 'text';
-    input.onchange = () => {
-        let lut = $settings.LUTs[name];
-        $settings.LUTs[name] = null;
-        name = input.value;
-        $settings.LUTs[name] = lut;
-        refresh_all_plots();
-    };
-
-    let [box, label] = create_input("checkbox", bilinear, {label: "Bilinear Filtering"}, "bilinear-" + name, () => {
-        $settings.LUTs[name].bilinear = box.checked;
-        refresh_all_plots();
-    });
-
-    let div = document.createElement("div");
-    div.style = "padding-top: 9px";
-    div.appendChild(box);
-    div.appendChild(label);
-
-    let div2 = document.createElement("div");
-    div2.appendChild(input);
-    div2.appendChild(div);
-
-    add_list_element('#lut_list', "display: flex; flex-direction: row", [canvas, div2]);
-
-    $settings.LUTs[name] = { url, bilinear: true, image: null };
+    let lut_sampler = new Function('x', 'y', 'channel', `return sample_lut('${name}', x, y, channel)`);
+    add_setting(name, "lut", lut_sampler, { bilinear, canvas, url });
 
     return url != null ? load_lut_async(url, name, canvas) : null;
 }
 
 function sample_lut(name, x, y, channel)
 {
-    let data = $settings.LUTs[name].image;
+    let lut = $settings.settings[name], data = lut.image;
     if (data == null) return 0;
 
     x = saturate(x) * (data.width - 1);
@@ -211,7 +180,7 @@ function sample_lut(name, x, y, channel)
         return data.data[coord + channel] / 255;
     }
 
-    if (!data.bilinear)
+    if (!lut.settings.bilinear)
         return load_lut(Math.round(x), Math.round(y));
 
     let x_low = Math.floor(x);
@@ -250,13 +219,14 @@ function add_setting(name, type, initial_value, settings = {})
 
     let [input, label] = create_input(type, initial_value, settings, "settings-" + name, (value) => {
         window[name] = value;
+        $settings.settings[name].value = value;
         refresh_all_plots();
     });
 
     label.style = "margin-right: 30px";
 
     window[name] = initial_value;
-    $settings.settings[name] = { type, initial_value, settings: {...settings} };
+    $settings.settings[name] = { type, value: initial_value, settings: {...settings} };
 
     add_list_element('#settings_list', "display: flex; flex-direction: row", [label, input], (li) => {
         delete $settings.settings[name];
@@ -930,6 +900,30 @@ document.querySelector("#modal .close").onclick = () => { modal.style.display = 
 
 function create_input(type, value, settings, id, onChange)
 {
+    if (type == "lut")
+    {
+        let label = document.createElement("label");
+        label.htmlFor = settings.canvas.id;
+        label.innerText = settings.label;
+
+        let [box, box_label] = create_input("checkbox", settings.bilinear, {label: "Bilinear Filtering"}, "bilinear-" + name, () => {
+            settings.bilinear = box.checked;
+            refresh_all_plots();
+        });
+
+        let div = document.createElement("div");
+        div.style = "padding-top: 9px";
+        div.appendChild(box);
+        div.appendChild(box_label);
+
+        let input = document.createElement("div");
+        input.appendChild(label);
+        input.appendChild(div);
+
+        return [input, settings.canvas];
+    }
+
+
     classes = {
         checkbox: "form-check-input",
         number: "form-control",

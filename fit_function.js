@@ -89,7 +89,10 @@ function fit_function(model, dataset, onstep, onfinish)
 
     let globals = {};
     for (let name in $settings.settings)
-        globals[name] = window[name];
+    {
+        if (!window[name] instanceof Function)
+            globals[name] = window[name];
+    }
     for (let name in $settings.plots)
         globals[name] = window[name].toString();
 
