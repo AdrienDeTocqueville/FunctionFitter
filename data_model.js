@@ -9,35 +9,48 @@ set_theme(localStorage.getItem('theme'));
 deserialize({});
 
 // Modal
+function project_modal_content (callback)
+{
+    let content = document.createElement("div");
+    content.className = "single-line";
+    content.innerHTML = `
+        <input class="form-control" type="text">${loaded_project || ""}</input>
+        <button class="btn btn-success" style="padding-left: 15px 0; margin-left: 10px;">Save</button>
+    `;
+
+    content.querySelector("input").onkeyup = (e) => {
+        if (e.key == "Enter")  document.querySelector("#modal button").click();
+        if (e.key == "Escape") Modal.close();
+    };
+
+    content.querySelector("button").onclick = () => {
+        let name = document.querySelector("#modal input").value;
+        if (/^\s*$/.test(name)) return; // empty
+        document.querySelector("#project-name").innerText = loaded_project = name;
+        Modal.close();
+        callback();
+    }
+
+    return content;
+}
+
 document.querySelector("#project-name").onclick = () => {
-    document.querySelector("#modal input").value = loaded_project || "";
     let previous_name = loaded_project;
-    open_modal(() => {
+    Modal.open("Rename Project", project_modal_content(() => {
         if ($projects[previous_name])
         {
             $projects[loaded_project] = $projects[previous_name];
             delete $projects[previous_name];
             save_projects();
         }
-    });
+    }));
     document.querySelector("#modal input").focus();
 }
-document.querySelector("#modal input").onkeyup = (e) => {
-    if (e.key == "Enter")  document.querySelector("#modal button").click();
-    if (e.key == "Escape") document.querySelector("#modal .close").click();
-};
-document.querySelector("#modal button").onclick = () => {
-    let name = document.querySelector("#modal input").value;
-    document.querySelector("#modal input").value = "";
-    if (/^\s*$/.test(name)) return; // empty
-    document.querySelector("#project-name").innerText = loaded_project = name;
-    close_modal();
-};
 
 document.querySelector("#save").onclick = () => {
     if (loaded_project == null)
     {
-        open_modal(save_project);
+        Modal.open("Save As", project_modal_content(save_project));
         document.querySelector("#modal input").focus();
     }
     else
@@ -98,8 +111,6 @@ function default_settings()
 function serialize()
 {
     let serialized = default_settings();
-    serialized.graph_dimensions = $settings.graph_dimensions;
-    serialized.resolution = $settings.resolution;
     serialized.settings = $settings.settings;
 
     for (let name in $settings.models)
@@ -165,8 +176,7 @@ function deserialize(data)
     document.querySelector("#sliders").innerHTML = "";
     document.querySelector("#variable_list").innerHTML = "";
     document.querySelector("#settings_list").innerHTML = "";
-    document.querySelector("#model_list").innerHTML = "";
-    document.querySelector("#reference_list").innerHTML = "";
+    document.querySelector("#function_list").innerHTML = "";
 
     if ($settings)
     {
@@ -177,12 +187,9 @@ function deserialize(data)
     }
 
     $settings = {
-        graph_dimensions: data.graph_dimensions,
-        resolution: data.resolution,
         plots: {},
-        models: {},
         settings: {},
-        references: [],
+        functions: {},
         parameter_names: [],
         dimensions: undefined,
         parameters: undefined,
@@ -194,8 +201,6 @@ function deserialize(data)
     // Load
 
     document.querySelector("#project-name").innerText = loaded_project || "Unnamed Project";
-    shape_selector.value = data.graph_dimensions;
-    resolution_selector.value = data.resolution;
 
     for (let name in data.settings)
     {

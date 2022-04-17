@@ -1,40 +1,11 @@
-let shape_selector = document.querySelector("#shape-selector");
-shape_selector.onchange = () => {
-    $settings.graph_dimensions = parseInt(shape_selector.value);
-    ensure_sliders();
-    refresh_all_plots();
-}
-
-let resolution_selector = document.querySelector("#resolution");
-resolution_selector.onchange = () => {
-    $settings.resolution = resolution_selector.valueAsNumber;
-    refresh_all_plots();
-}
-
-Split(["#controls", "#plots", "#settings"], {sizes: [20, 40, 40]});
+Split(["#controls", "#main", "#settings"], {sizes: [20, 40, 40]});
 
 let default_func = `function new_function(x, y)
 {
     return x + y;
 }`;
 
-hook_add_buttons();
-
-function random(min = 0, max = 1) { return Math.random() * (max - min) + min; }
-function truncate(x, precision=2) { return Number(x.toFixed(precision)); }
-function saturate(x)              { return Math.max(0, Math.min(x, 1)); }
-function lerp(a, t, b)            { return (1 - t) * a + t * b; }
-function polynom(x)
-{
-    let res = arguments[1];
-    let x_p = x;
-    for (let i = 2; i < arguments.length; i++)
-    {
-        res += x_p * arguments[i];
-        x_p *= x;
-    }
-    return res;
-}
+//hook_add_buttons();
 
 /// LISTS
 
@@ -60,9 +31,135 @@ function add_list_element(list, style, children, on_delete)
     document.querySelector(list).appendChild(li);
 }
 
+let Modal = {
+    open: (title, content) => {
+        let modal = document.createElement("div");
+        modal.id = "modal";
+        modal.innerHTML = `
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h5 style="margin-top: 20px; margin-bottom: 20px">${title}</h5>
+            </div>`;
+
+        modal.onclick = (event) => { if (modal == event.path[0]) Modal.close(); }
+        modal.querySelector(".close").onclick = Modal.close;
+
+        document.body.appendChild(modal);
+        let h5 = modal.querySelector("h5");
+        h5.parentNode.insertBefore(content, h5.nextSibling);
+    },
+    close: () => { document.querySelector("#modal").remove(); }
+};
+
+class TabList
+{
+    // Requirements on elem_type
+    // functions: on_display, on_settings
+    // properties: name
+    constructor(id, elem_type, has_settings = false)
+    {
+        this.tabs = [];
+        this.element = document.querySelector(id);
+
+        this.ul = document.createElement("ul");
+        this.ul.className = "nav nav-tabs";
+
+        let li = document.createElement("li");
+        li.className = "nav-item nav-link active";
+        li.innerText = "+";
+        li.tabIndex = -1;
+        li.onclick = () => { this.add_element(new elem_type()); }
+
+        this.active_tab = li;
+
+        this.content = document.createElement("div");
+        this.content.style = "border: 1px solid #ddd; padding: 15px;"
+
+        this.ul.appendChild(li);
+        this.element.appendChild(this.ul);
+        this.element.appendChild(this.content);
+
+        if (has_settings)
+        {
+            this.element.style = "position: relative";
+            this.ul.style = "max-width: calc(100% - 20px)";
+            let settings = document.createElement("i");
+            settings.className = "fa-solid fa-ellipsis-vertical";
+            settings.style = "position: absolute; top: 12px; right: 0px; width: 20px; text-align: center";
+            settings.onclick = () => {
+                if (this.active_tab.tabIndex == -1) return;
+                let elem = this.tabs[this.active_tab.tabIndex];
+                elem.on_settings();
+            }
+            this.element.appendChild(settings);
+        }
+    }
+
+    add_element(elem)
+    {
+        let li = document.createElement("li");
+        li.className = "nav-item nav-link"
+        li.innerText = elem.name;
+        li.tabIndex = this.tabs.length;
+        li.onclick = () => {
+            this.active_tab.classList.remove("active");
+            this.active_tab = li;
+            this.active_tab.classList.add("active");
+
+            this.content.innerHTML = "";
+            elem.on_display(this.content);
+        }
+
+        this.ul.insertBefore(li, this.ul.children[this.ul.childElementCount-1]);
+
+        this.tabs.push(elem);
+        li.onclick();
+        if (elem.on_settings != undefined)
+            elem.on_settings();
+    }
+}
+
+class Table
+{
+    constructor(headers)
+    {
+        let table = document.createElement("table");
+        table.className = "table table-bordered";
+        table.innerHTML = "<thead> <tr></tr> </thead> <tbody></tbody>";
+
+        let row = table.querySelector("tr");
+        for (let title of arguments)
+        {
+            let elem = document.createElement("th");
+            elem.scope = "col";
+            elem.innerText = title;
+            row.appendChild(elem);
+        }
+
+        this.element = table;
+    }
+
+    add_row(elements)
+    {
+        let body = this.element.querySelector("tbody");
+        let row = document.createElement("tr");
+        for (let i = 0; i < arguments.length; i++)
+        {
+            let elem = document.createElement(i == 0 ? "th" : "td");
+            if (i == 0) elem.scope = "row";
+            if (typeof arguments[i] === "string")
+                elem.innerText = arguments[i];
+            else
+                elem.appendChild(arguments[i]);
+            row.appendChild(elem);
+        }
+        body.appendChild(row);
+    }
+}
+
 function hook_add_buttons()
 {
-    document.querySelector("#add_ref").onclick = () => {
+    document.querySelector("#add_function").onclick = () => {
         add_reference(default_func, false);
     }
 
@@ -216,8 +313,9 @@ function add_setting(name, type, initial_value, settings = {})
         return;
 
     settings.label = name;
+    settings.id = "settings-" + name;
 
-    let [input, label] = create_input(type, initial_value, settings, "settings-" + name, (value) => {
+    let [input, label] = create_input(type, initial_value, settings, (value) => {
         window[name] = value;
         $settings.settings[name].value = value;
         refresh_all_plots();
@@ -234,7 +332,6 @@ function add_setting(name, type, initial_value, settings = {})
         li.remove();
     });
 }
-
 
 /// FUNCTIONS
 
@@ -253,7 +350,7 @@ function parse_parameters(code)
 
 function create_code_editor(code, div, min_line_count, onChange)
 {
-    let line_count = Math.min(min_line_count, code.split(/\r\n|\r|\n/).length);
+    let line_count = Math.min(min_line_count, code.split(/\r\n|\r|\n/).length - 1);
     div.style = `margin-top: 5px; height: ${line_count*17 + 8}px`;
     div.className = "editor";
     div.innerHTML = code;
@@ -274,181 +371,6 @@ function create_code_editor(code, div, min_line_count, onChange)
     });
 }
 
-function add_model(code, ref)
-{
-    let fn = code;
-    if (!(code instanceof Function))
-        fn = eval("(" + code + ")");
-    else
-        code = fn.toString();
-
-    if (ref == undefined)
-        ref = $settings.references[0];
-
-    let parameters = parse_parameters(code);
-
-    let variables = new Array(parameters.length - 1);
-    for (let i = 0; i < variables.length; i++)
-    {
-        let name = parameters[i+1];
-       variables[i] = get_or_create_variable(name);
-    }
-
-    let get_variable_values = () => {
-        let values = new Array(variables.length);
-        for (let i = 0; i < variables.length; i++)
-            values[i] = variables[i].value;
-        return values;
-    }
-
-    window[fn.name] = fn;
-    let model = { func: fn, variables, ref };
-    $settings.models[fn.name] = model;
-    $settings.plots[fn.name] = { data: null, display: true, parameters };
-
-    // Create UI
-    let target_input = null;
-    let params_input = null;
-    let mse_label = null;
-
-    let replace_elem = (previous_value, new_value) => {
-        if (previous_value != null) previous_value.replaceWith(new_value);
-        return new_value;
-    }
-
-    model.refresh_targets = () => {
-        if (model.ref == undefined)
-            model.ref = $settings.references[0];
-        let ref_index = $settings.references.indexOf(model.ref);
-
-        let settings = {
-            values: $settings.references,
-            dropdown: true,
-            width: "120px",
-        };
-        target_input = replace_elem(target_input, create_input("number", ref_index, settings, "target-" + fn.name, (new_index) => {
-            model.ref = settings.values[new_index];
-        }));
-
-        /*
-        settings.values = $settings.parameter_names;
-        settings.multiple = true;
-        params_input = replace_elem(params_input, create_input("number", 0, settings, "target-" + fn.name));
-        */
-    };
-
-    model.refresh_mse = () => {
-        let ref = model.ref;
-        let predict = $settings.plots[fn.name].predict;
-
-        let mse = 0, dataset = get_dataset(ref);
-        for (let i = 0; i < dataset.x_values.length; i++)
-            mse += Math.pow(predict(...dataset.x_values[i]) - dataset.y_values[i], 2);
-        mse /= dataset.x_values.length;
-
-        let new_label = document.createElement("div");
-        new_label.style = "padding: 2px; margin-left: 20px";
-        new_label.innerText = "MSE: " + truncate(mse, 5);
-        mse_label = replace_elem(mse_label, new_label);
-    };
-
-    model.rebuild_model = () => {
-        let values = get_variable_values();
-        $settings.plots[fn.name].predict = (...args) => fn(args, ...values);
-        model.refresh_mse();
-        refresh_plot(fn.name);
-    };
-
-    model.refresh_targets();
-    model.rebuild_model();
-
-    let onstart = () => {
-        if (button.innerText == "...")
-            return onfinish();
-
-        button.innerText = "...";
-        fit_function(model, get_dataset(model.ref), onstep, onfinish);
-    };
-    let onstep = () => {
-    };
-    let onfinish = (new_parameters) => {
-        button.innerText = "Fit";
-        model.rebuild_model();
-    }
-
-    let button = document.createElement("button");
-    button.style = "height: 29px; padding-bottom: 0; padding-top: 0; margin-left: auto";
-    button.type = "button";
-    button.classList.add('btn', 'btn-primary');
-    button.innerText = "Fit";
-    button.onclick = onstart;
-
-    let controls = document.createElement("div");
-    controls.style = "display: flex; flex-direction: row; width: 100%";
-    controls.appendChild(target_input);
-    controls.appendChild(mse_label);
-    controls.appendChild(button);
-
-    let editor = document.createElement("div");
-    editor.id = "editor-" + fn.name;
-
-    add_list_element('#model_list', "", [controls, editor]);
-
-    create_code_editor(code, editor, 10, (new_code) => {
-        if ($settings.plots[fn.name].display == false)
-            return;
-
-        let validate_model = () => {
-            try {
-                let new_func = eval("(" + new_code + ")");
-                new_func([...new Array($settings.dimensions - 1)].fill(0), ...get_variable_values());
-                return new_func;
-            }
-            catch (error) { console.log(error); } // Syntax error
-        };
-
-        let new_func = validate_model();
-        if (new_func == undefined || new_func.name != fn.name)
-            return;
-
-        fn = new_func;
-        model.func = new_func;
-        model.rebuild_model();
-        console.log("model was recompiled");
-    });
-}
-
-function get_or_create_variable(name, initial_value = undefined)
-{
-    let variable = $settings.variables[name];
-    if (variable == null)
-    {
-        variable = { value: initial_value || Math.random(), name };
-
-        let settings = { label: name, step: 0.001 }
-        let [input, label] = create_input("number", null, settings, "variable-" + name, (new_value) => {
-            variable.value = new_value;
-
-            for (let name in $settings.models)
-            {
-                if ($settings.models[name].variables.includes(variable))
-                    $settings.models[name].rebuild_model();
-            }
-        });
-
-        variable.refresh_input = () => {
-            input.valueAsNumber = truncate(variable.value, 5);
-        };
-
-        variable.refresh_input();
-        label.style = "margin-right: 10px";
-        add_list_element('#variable_list', "display: flex; flex-direction: row", [label, input]);
-
-        $settings.variables[name] = variable;
-    }
-    return variable;
-}
-
 function validate_reference(code)
 {
     try {
@@ -458,7 +380,7 @@ function validate_reference(code)
     } catch (error) { console.error(error); }
 }
 
-function add_reference(code, display, refresh = true)
+function add_function(code, display, refresh = true)
 {
     let fn;
     if (code instanceof Function)
@@ -477,19 +399,13 @@ function add_reference(code, display, refresh = true)
     }
 
     let parameters = parse_parameters(code);
-    generate_sliders(parameters);
-
-    let [input, label] = create_input("checkbox", display, {label: "Display"}, "display-" + fn.name, () => {
-        $settings.plots[fn.name].display = input.checked;
-        draw_plots();
-    });
 
     let editor = document.createElement("div");
     editor.id = "editor-" + fn.name;
 
-    add_list_element('#reference_list', "", [input, label, editor]);
+    add_list_element('#function_list', "", [editor]);
 
-    create_code_editor(code, editor, 10, (new_code) => {
+    create_code_editor(code, editor, 15, (new_code) => {
         if ($settings.plots[fn.name].display == false)
             return;
 
@@ -500,13 +416,8 @@ function add_reference(code, display, refresh = true)
         refresh_plot(fn.name);
     });
 
-    $settings.references.push(fn.name);
-    for (let model in $settings.models)
-        $settings.models[model].refresh_targets();
-
     window[fn.name] = fn;
-    $settings.plots[fn.name] = { func: fn, data: null, dataset: null, display, parameters };
-    if (refresh) refresh_plot(fn.name);
+    $settings.functions[fn.name] = {parameters, func: fn};
 }
 
 /// SLIDERS
@@ -885,20 +796,7 @@ function set_theme(theme)
     document.body.setAttribute('data-theme', theme);
 }
 
-let modal = document.querySelector("#modal");
-let modal_callback = null;
-let open_modal = (callback) => {
-    modal.style.display = "block";
-    modal_callback = callback;
-}
-let close_modal = (callback) => {
-    modal.style.display = "none";
-    if (modal_callback != null) modal_callback();
-}
-
-document.querySelector("#modal .close").onclick = () => { modal.style.display = "none"; };
-
-function create_input(type, value, settings, id, onChange)
+function create_input(type, value, settings, onChange)
 {
     if (type == "lut")
     {
@@ -906,7 +804,7 @@ function create_input(type, value, settings, id, onChange)
         label.htmlFor = settings.canvas.id;
         label.innerText = settings.label;
 
-        let [box, box_label] = create_input("checkbox", settings.bilinear, {label: "Bilinear Filtering"}, "bilinear-" + name, () => {
+        let [box, box_label] = create_input("checkbox", settings.bilinear, {label: "Bilinear Filtering", id: "bilinear-" + name}, () => {
             settings.bilinear = box.checked;
             refresh_all_plots();
         });
@@ -924,15 +822,76 @@ function create_input(type, value, settings, id, onChange)
     }
 
 
-    classes = {
-        checkbox: "form-check-input",
-        number: "form-control",
-        range: "form-range",
-        text: "form-control",
-    };
-
     let input;
-    if (Array.isArray(settings.values))
+    if (type == "dropdown")
+    {
+        input = document.createElement("div");
+        input.className = "btn-group";
+
+        let button = document.createElement("button");
+        button.className = "btn btn-sm btn-secondary dropdown-toggle";
+        button.type = "button";
+        button.disabled = settings.disabled == true;
+
+        let multiselect = Array.isArray(value);
+        let update_label = () => {
+            if (!multiselect) return button.innerText = settings.values[value];
+            let label = "";
+            for (let val of value)
+                label += (label != "" ? ", " : "") + settings.values[val];
+            button.innerText = label;
+        }
+        update_label();
+
+        let ul = document.createElement("ul");
+        ul.className = "dropdown-menu";
+        for (let i = 0; i < settings.values.length; i++)
+        {
+            let disabled = settings.disabled_values && settings.disabled_values.includes(i);
+            let li = document.createElement("li");
+            li.className = "dropdown-item" + (disabled ? " disabled" : "");
+            if (!multiselect)
+            {
+                li.innerText = settings.values[i];
+                if (i == value) li.classList.add("active");
+                li.onclick = () => {
+                    ul.children[value].classList.remove('active');
+                    value = i;
+                    ul.children[value].classList.add('active');
+                    update_label();
+                    if (onChange) onChange(value);
+                }
+            }
+            else
+            {
+                let [box, label] = create_input("checkbox", value.includes(i), {label: settings.values[i]});
+                li.appendChild(box);
+                li.appendChild(label);
+                li.onclick = (e) => {
+                    if (value.includes(i))
+                    {
+                        box.checked = false;
+                        value = value.filter(x => x != i);
+                    }
+                    else
+                    {
+                        box.checked = true;
+                        value.push(i);
+                        value.sort();
+                    }
+                    update_label();
+                    e.stopPropagation();
+
+                    if (onChange) onChange(value);
+                }
+            }
+            ul.appendChild(li);
+        }
+
+        input.appendChild(button);
+        input.appendChild(ul);
+    }
+    else if (Array.isArray(settings.values))
     {
         if (settings.dropdown == true)
         {
@@ -948,15 +907,16 @@ function create_input(type, value, settings, id, onChange)
         {
             input = document.createElement("ul");
             input.classList.add('nav', 'nav-pills', 'nav-fill');
+
             let html = "";
             for (let j = 0; j < settings.values.length; j++)
-                html += `<li class='nav-item'><a style="height: 26px; padding-bottom: 0; padding-top: 0" class='nav-link ${j==value?"active":""}'>${settings.values[j]}</a></li>`;
+                html += `<li class='nav-item nav-link ${j==value?"active":""}' style="height: 31px; padding: 0.25rem 0.5rem; font-size: .875rem; cursor: pointer">${settings.values[j]}</li>`;
             input.innerHTML = html;
             for (let j = 0; j < settings.values.length; j++)
             {
                 input.children[j].onclick = () => {
-                    input.children[value].children[0].classList.remove('active');
-                    input.children[j].children[0].classList.add('active');
+                    input.children[value].classList.remove('active');
+                    input.children[j].classList.add('active');
                     value = j;
                     if (onChange) onChange(value);
                 }
@@ -965,12 +925,22 @@ function create_input(type, value, settings, id, onChange)
     }
     else
     {
+        let classes = {
+            checkbox: "form-check-input",
+            number: "form-control",
+            range: "form-range",
+            text: "form-control",
+        };
+
         input = document.createElement("input");
         input.className = classes[type];
         input.type = type;
     }
 
-    input.id = id;
+    if (settings.id == undefined && settings.label != undefined)
+        settings.id = "input-" + settings.label;
+
+    input.id = settings.id;
     input.step = settings.step;
     let width = settings.width || "100%";
 
@@ -983,7 +953,7 @@ function create_input(type, value, settings, id, onChange)
         let label = document.createElement("label");
         label.style = "width: 50px";
         label.innerText = value;
-        label.htmlFor = id;
+        label.htmlFor = settings.id;
 
         let rangeInput = input;
         input.onchange = null;
@@ -1000,10 +970,11 @@ function create_input(type, value, settings, id, onChange)
     }
     else
     {
-        if (type == 'checkbox')
-            input.style = "margin-right: 5px";
-        else
-            input.style = `width: ${width}; padding-bottom: 0; padding-top: 0`;
+        let style = (type == 'checkbox') ? "margin-right: 5px;" :
+            `width: ${width}; padding-bottom: 0; padding-top: 0;`;
+        if (settings.style != undefined)
+            style += settings.style;
+        input.style = style;
 
         if (!Array.isArray(settings.values))
         {
@@ -1022,8 +993,9 @@ function create_input(type, value, settings, id, onChange)
         return input;
 
     let label = document.createElement("label");
-    label.htmlFor = id;
+    label.htmlFor = settings.id;
     label.innerHTML = settings.label;
+    label.style = "white-space: nowrap; padding: 2px; padding-right: 6px";
 
     return [input, label];
 }

@@ -1,28 +1,15 @@
 // C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera\launcher.exe --allow-file-access-from-files
 
-// HLSL EMULATION
-function rcp(x) { return 1 / x; }
-function float2(x, y) { return {x, y}; }
-function float3(x, y, z) { return {x, y, z}; }
-function dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
-function normalize(a) { let f = 1.0 / Math.sqrt(dot(a, a)); return float3(a.x*f, a.y*f, a.z*f); }
-function add(a, b) { return float3(a.x+b.x, a.y+b.y, a.z+b.z); }
-function sub(a, b) { return float3(a.x-b.x, a.y-b.y, a.z-b.z); }
-// END HLSL
-
-function model_f (input, l, o, s)
+function model_f (x, z,   l, o, s)
 {
-    let [x, z] = input;
     z *= s;
     return saturate(l*z / Math.pow(l*l + z*z + o, 2));
     //let num = polynom(z, a, b, c);
     //return saturate(num / (d + Math.pow(l*l + z*z, 2)));
 }
 
-function model_2d(input, l, s, d)
+function model_2d(x, z,   l, s, d)
 {
-    let [x, z] = input;
-
     let res = l * z / Math.pow(l*l + (z-d)*(z-d)*s, 2);
     return Math.max(res, 0);
 }
@@ -113,27 +100,20 @@ function area_light(x, z)
     return diffuseLighting * INV_PI / DIFFUSE_SCALE;
 }
 
-function area_light_weighted(x, z)
-{
-    z *= S;
-    return L*z / Math.pow(L*L + z*z + O, 2);
-
-}
-
-
 add_setting("DIFFUSE_SCALE", "number", 100);
 add_setting("LIGHT_HEIGHT", "number", 1);
 add_setting("LIGHT_WIDTH", "number", 2);
 add_setting("L", "range", 0.2, {min: 0, max: 1.5, step: 0.05});
 add_setting("O", "range", 0.0, {min: 0, max: 3, step: 0.05});
 add_setting("S", "range", 1, {min: 0, max: 3, step: 0.05});
-add_reference(area_light, true);
-add_reference(area_light_weighted, true);
 
-// TODO: find a way to do that properly
-$settings.parameters[0].range = [0, 5];
-$settings.parameters[1].range = [-1, 4];
-rebuild_ranges();
+add_function(area_light);
+add_function(model_2d);
+add_function(model_f);
 
-add_model(model_f);
-add_model(model_2d);
+Plot.tab_list.add_element(new Plot());
+
+
+//$settings.parameters[0].range = [0, 5];
+//$settings.parameters[1].range = [-1, 4];
+//rebuild_ranges();

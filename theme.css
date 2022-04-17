@@ -40,8 +40,7 @@ body > header
 .header-list { display: flex; position: absolute; }
 .header-list > i { padding-right: 10px; padding-left: 10px; line-height: 1; }
 #project-name { padding-right: 0px; }
-i { cursor: pointer; color: #ddd; }
-i:hover { color: #fff; }
+header i:hover { color: #fff; }
 header > #right { right: 15px; }
 header > #left { left: 15px; }
 
@@ -91,11 +90,28 @@ h3 { position: relative; }
 }
 .deletable-list:hover .close { display: block; }
 
+.nav-tabs { border-bottom: 0px; cursor: pointer; }
+
 /* Misc. */
 
+i { cursor: pointer; color: #ddd; }
+i:hover { color: #bbb; }
 .single-line { display: flex; flex-direction: row; }
 .lut-canvas:hover { filter: brightness(70%); }
 #sliders form input { width: 20%; height: 1.5rem; }
+
+.dropdown-toggle:focus { pointer-events: none; }
+.dropdown-toggle:focus + .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.dropdown-menu {
+    opacity: 0;
+    display: block;
+    visibility: hidden;
+    transition: visibility 0.5s;
+}
 
 .close
 {
@@ -116,9 +132,8 @@ h3 { position: relative; }
 
 #modal
 {
-    display: none;
     position: fixed;
-    z-index: 1;
+    z-index: 10;
     left: 0;
     top: 0;
     width: 100%;
@@ -133,17 +148,10 @@ h3 { position: relative; }
     padding: 15px 40px 55px;
     background-color: #fefefe;
     position: absolute;
+    width: max-content;
     top: 10vh;
     left: 50%;
-    margin-left: -243px;
-    width: 486px;
-}
-
-#modal button
-{
-    padding-left: 15px;
-    padding-right: 15px;
-    margin-left: 10px;
+    transform: translate(-50%, 0px);
 }
 
 /* Drawer */
@@ -179,3 +187,10 @@ h3 { position: relative; }
 #drawer[project-drawer="opened"] { left: 0px; }
 main[project-drawer="opened"] { transform: translate(300px, 0px); overflow-x: hidden; }
 main { transition: transform .5s; }
+
+
+#function_list > li { padding: 0; padding-bottom:8px;}
+/* Fitting settings */
+
+#profile span { padding: 2px; }
+#profile ul { padding-left: 0; }

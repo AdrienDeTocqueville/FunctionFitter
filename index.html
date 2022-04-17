@@ -53,21 +53,96 @@
             <ul id="variable_list"> </ul>
         </div>
 
-        <div class="pannel" id="plots" style="">
+        <div class="pannel" id="main" style="">
 
-            <br/>
-            <div class="single-line" style="justify-content: space-around; padding-bottom: 4px;">
-                <select class="form-select form-select-sm" id="shape-selector" style="width: 200px">
-                    <option value="2" selected>2D Graph</option>
-                    <option value="3">3D Surface</option>
-                </select>
-                <div style="display: flex">
-                    <label style="margin-right: 10px; font-size: 19px" for="resolution">Resolution</label>
-                    <input style="width: 200px" class="form-control form-control-sm" id="resolution" type="number" min="0" value="64"/>
+            <div id="plots"></div>
+
+            <hr/>
+
+            <div id="fits"></div>
+
+            <div>
+                <ul class="nav nav-tabs" style="border-bottom: 0px">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="#">model_f</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" tabindex="-1">+</a>
+                    </li>
+                </ul>
+
+
+                <div id="profile" style="border: 1px solid #ddd; padding: 15px;">
+                    <div class="single-line">
+                        <span>Reference&nbsp;&nbsp;</span>
+
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-secondary dropdown-toggle" type="button"> area_light </button>
+                            <ul class="dropdown-menu">
+                                <li class="dropdown-item">area_light</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <p>Parameters</p>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Settings</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">x</th>
+                                <td>Constant</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">z</th>
+                                <td>Range</td>
+                                <td>[-1, 4]    |    64 subdivisions</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p>Trainables</p>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Settings</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">l</th>
+                                <td>Value</td>
+                                <td>value: 2</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">s</th>
+                                <td>Polynom</td>
+                                <td>inputs: (x,z), order: 3</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">d</th>
+                                <td>Constant</td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p>Expression</p>
+                    <p>model_f(0, z, 2, polynom(x, s_0, s_1, s_2), d)</p>
+
+                    <button class="btn btn-sm btn-primary" type="button">Fit 64 functions</button>
+
                 </div>
             </div>
 
-            <div id="plot"></div>
 
         </div>
 
@@ -78,35 +153,21 @@
             <ul id="settings_list"> </ul>
 
             <hr/>
-            <h3>Models
-                <button type="button" class="btn btn-outline-secondary header-button" id="add_model">+</button>
+            <h3>Functions
+                <button type="button" class="btn btn-outline-secondary header-button" id="add_function">+</button>
             </h3>
-            <ul id="model_list"> </ul>
+            <ul id="function_list"> </ul>
 
             <hr/>
-            <h3>References
-                <button type="button" class="btn btn-outline-secondary header-button" id="add_ref">+</button>
-            </h3>
-            <ul id="reference_list"> </ul>
-        </div>
-
-        <div id="modal" onclick="if (this == event.path[0]) close_modal()">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <br/>
-                <h5>Rename Project</h5>
-                <div class="single-line" style="margin-top:10px">
-                    <input class="form-control" type="text"></input>
-                    <button class="btn btn-success">Save</button>
-                </div>
-            </div>
         </div>
 
     </main>
 
     <script src="split.js"></script>
+    <script src="math_lib.js"></script>
 
     <script src="layout_utils.js" defer></script>
+    <script src="Plot.js" defer></script>
     <script src="data_model.js" defer></script>
     <script src="fit_function.js" defer></script>
 
