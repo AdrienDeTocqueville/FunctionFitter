@@ -2,13 +2,15 @@ class Fitting
 {
     static tab_list = new TabList('#fitting_list', Fitting);
 
-    constructor(ref, value)
+    constructor(settings, name)
     {
-        this.name = "model_" + (Fitting.tab_list.tabs.length + 1);
+        this.name = name || "model_" + (Fitting.tab_list.tabs.length + 1);
 
-        this.ref = ref.name;
-        this.constant = new Set();
-        this.expression = new Expression(value || "0", this.name);
+        this.ref = settings.ref;
+        if (this.ref instanceof Function) this.ref = this.ref.name;
+
+        this.constant = new Set(settings.constant);
+        this.expression = new Expression(settings.value || "0", this.name);
 
         Fitting.tab_list.add_element(this);
     }
@@ -59,7 +61,7 @@ class Fitting
             }
 
             let dependencies = [].concat(...variables.map(v => Variable.get(v).dependencies));
-            dependencies = [...new Set([...dependencies])].filter(v => !variables.includes(v));
+            dependencies = [...new Set(dependencies)].filter(v => !variables.includes(v) && !inputs.includes(v));
             if (dependencies.length != 0)
             {
                 let dep_table = new Table("Dependency", "Value");

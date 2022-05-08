@@ -89,56 +89,20 @@ class Expression
         });
     }
 
-    static sort_by_dependency(variables)
-    {
-        let definitions = [], defined = new Set(), has_change;
-        do {
-            has_change = false;
-            for (const name of variables)
-            {
-                let variable = Variable.get(name);
-                if (variable.dependencies.some(v => !defined.has(v))) continue;
-
-                definitions.push(variable);
-                defined.add(name);
-                has_change = true;
-
-                variables.delete(name);
-            }
-        } while (has_change);
-        return definitions;
-    }
-
     compile(axis_1, axis_2)
     {
-        let inputs = [], dependencies = new Set();
-        let track_dependencies = (variable) => {
-            if (dependencies.has(variable))
-                return;
-            dependencies.add(variable);
-            for (let d of Variable.get(variable).dependencies)
-                track_dependencies(d);
-        }
-
-        for (let i = 0; i < this.parameters.length; i++)
-        {
-            let param = this.parameters[i];
-            if (param == axis_1.name || param == axis_2?.name)
-                inputs.push(param);
-            else
-                track_dependencies(param);
-        }
-
         let definitions = "";
+        let params = this.parameters.map(p => Variable.get(p));
+        let dependencies = Variable.get_dependencies(params, [axis_1, axis_2]);
         if (dependencies.size != 0)
         {
-            let sorted = Expression.sort_by_dependency(dependencies);
+            let sorted = Variable.sort_by_dependency(dependencies, [axis_1, axis_2]);
             definitions = `let ${sorted.map(v => v.name + "=" + v.value).join(',')};`;
         }
 
         let body = !this.is_function ? `${definitions} return ${this.source}` :
             `${definitions} return ${this.name}(${this.parameters.join(',')})`
-        return new Function(...inputs, body);
+        return new Function([axis_1.name, axis_2?.name], body);
     }
 }
 

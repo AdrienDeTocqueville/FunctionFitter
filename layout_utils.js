@@ -112,6 +112,16 @@ class TabList
         this.tabs.push(elem);
         li.onclick();
     }
+
+    clear()
+    {
+        this.ul.replaceChildren(this.ul.children[this.ul.childElementCount-1]);
+        this.active_tab = this.ul.children[0];
+        this.active_tab.classList.add("active");
+
+        this.tabs = [];
+        this.content.innerHTML = "";
+    }
 }
 
 class Table
@@ -168,10 +178,10 @@ function load_lut_async(url, name, canvas)
 
             context.clearRect(0, 0, img.width, img.height);
             context.drawImage(img, 0, 0);
-            $settings.settings[name].image = context.getImageData(0, 0, img.width, img.height);
+            $settings[name].image = context.getImageData(0, 0, img.width, img.height);
 
             refresh_all_plots();
-            resolve($settings.settings[name]);
+            resolve($settings[name]);
         };
         img.onerror = reject;
         img.src = url;
@@ -213,7 +223,7 @@ function add_lut(name, url, bilinear = true)
 
 function sample_lut(name, x, y, channel)
 {
-    let lut = $settings.settings[name], data = lut.image;
+    let lut = $settings[name], data = lut.image;
     if (data == null) return 0;
 
     x = saturate(x) * (data.width - 1);
@@ -265,143 +275,20 @@ function add_setting(name, type, initial_value, settings = {})
 
     let [input, label] = create_input(type, initial_value, settings, (value) => {
         window[name] = value;
-        $settings.settings[name].value = value;
+        $settings[name].value = value;
         refresh_all_plots();
     });
 
     label.style = "margin-right: 30px";
 
     window[name] = initial_value;
-    $settings.settings[name] = { type, value: initial_value, settings: {...settings} };
+    $settings[name] = { type, value: initial_value, settings: {...settings} };
 
     add_list_element('#settings_list', "display: flex; flex-direction: row", [label, input], (li) => {
-        delete $settings.settings[name];
+        delete $settings[name];
         delete window[name];
         li.remove();
     });
-}
-
-/// SLIDERS
-
-function generate_sliders(parameters)
-{
-    if ($settings.parameters == null)
-    {
-        $settings.dimensions = parameters.length + 1;
-        $settings.parameters = [];
-        for (let i = 0; i < parameters.length; i++)
-        {
-            $settings.parameter_names.push(parameters[i]);
-            $settings.parameters.push({ active: -1, name: parameters[i], index: i,
-                value: 0, range: [0, 1], resolution: 64
-            });
-        }
-    }
-    else if ($settings.dimensions != parameters.length + 1)
-    {
-        console.error("Wrong dimensions");
-        return;
-    }
-    else
-    {
-        for (let i = 0; i < parameters.length; i++)
-        {
-            let found = false;
-            for (let name in $settings.plots)
-            {
-                let plot = $settings.plots[name];
-                if (plot.parameters[i] == parameters[i])
-                    found = true;
-            }
-            if (found == false)
-            {
-                $settings.parameter_names[i] += ", " + parameters[i];
-                $settings.parameters[i].name = $settings.parameter_names[i];
-            }
-        }
-    }
-
-    ensure_sliders();
-}
-
-/// PLOT
-
-function get_dataset(name)
-{
-    let plot = $settings.plots[name];
-    if (plot == null)
-        return null;
-    if (plot.dataset == null)
-        plot.dataset = generate_dataset(plot.func || plot.predict);
-    return plot.dataset;
-}
-
-function _dirty_plot(name)
-{
-    let plot = $settings.plots[name];
-    plot.data = null;
-    if (plot.dataset != null)
-        plot.dataset = null;
-    if (plot.predict == null)
-    {
-        for (let model in $settings.models)
-        {
-            if ($settings.models[model].ref == name)
-                $settings.models[model].refresh_mse();
-        }
-    }
-}
-
-function refresh_plot(name)
-{
-    _dirty_plot(name);
-    draw_plots();
-}
-
-function refresh_all_plots()
-{
-    for (let name in $settings.plots)
-        _dirty_plot(name);
-    draw_plots();
-}
-
-function evaluate_func(plot)
-{
-    let trace = null;
-    let dataset = get_dataset(plot);
-
-    if ($settings.graph_dimensions == 2)
-    {
-        trace = {
-            type: "line",
-            x: new Array(dataset.resolution),
-            y: dataset.y_values,
-        };
-
-        for (let i = 0; i < dataset.resolution; i++)
-            trace.x[i] = dataset.x_values[i][dataset.axis1];
-    }
-    else if ($settings.graph_dimensions == 3)
-    {
-        trace = {
-            type: "surface",
-            x: new Array(dataset.resolution),
-            y: new Array(dataset.resolution),
-            z: new Array(dataset.resolution),
-        };
-
-        for (let i = 0; i < dataset.resolution; i++)
-        {
-            trace.x[i] = dataset.x_values[i][dataset.axis1];
-            trace.y[i] = dataset.x_values[i*dataset.resolution][dataset.axis2];
-
-            trace.z[i] = new Array(dataset.resolution);
-            for (let j = 0; j < dataset.resolution; j++)
-                trace.z[i][j] = dataset.y_values[i*dataset.resolution + j];
-        }
-    }
-
-    $settings.plots[plot].data = trace;
 }
 
 /// Project Drawer
@@ -441,10 +328,7 @@ function set_project_drawer(open)
 }
 
 document.querySelector("header .fa-bars").onclick = () => set_project_drawer();
-document.querySelector("#new-project").onclick = () => {
-    deserialize({});
-    set_project_drawer(false);
-}
+document.querySelector("#new-project").onclick = () => { deserialize(); set_project_drawer(false); }
 
 /// Misc.
 
@@ -747,4 +631,3 @@ function wrap(...elements)
         div.appendChild(elem);
     return div;
 }
-

@@ -1,21 +1,53 @@
 class Variable
 {
     static instances = {};
-    static proxy = new Proxy(Variable.instances, {
-        get(target, key) {
-            if (typeof key === "string")
-                Variable.references.push(key);
-            return 0;
-        }
-    });
 
     static get(name, fallback)
     {
         let v = this.instances[name];
-        if (v == undefined && name != undefined)
-            v = this.instances[name] = new Variable(name, fallback);
+        if (v != undefined || name == undefined)
+            return v;
+        return new Variable(name, fallback);
+    }
 
-        return v;
+    static get_dependencies(variables, ignore)
+    {
+        ignore = new Set(ignore || []);
+        let dependencies = new Set();
+        let track_dependencies = (variable) => {
+            if (ignore.has(variable)) return;
+            if (dependencies.has(variable)) return;
+
+            dependencies.add(variable);
+            for (let d of variable.dependencies)
+                track_dependencies(Variable.get(d));
+        }
+
+        variables.forEach(track_dependencies);
+        return dependencies;
+    }
+
+    static sort_by_dependency(variables, defined)
+    {
+        if (defined) defined = new Set(defined.map(v => v.name));
+        defined = defined || new Set();
+
+        let definitions = [], has_change;
+        do {
+            has_change = false;
+            for (const variable of variables)
+            {
+                if (variable.dependencies.some(v => !defined.has(v)))
+                    continue;
+
+                definitions.push(variable);
+                defined.add(variable.name);
+                has_change = true;
+
+                variables.delete(variable);
+            }
+        } while (has_change);
+        return definitions;
     }
 
     constructor(name, values)
@@ -29,6 +61,7 @@ class Variable
         if (values?.__proto__ === Object.prototype)
             values = values.value;
         this.set_value(values || 0);
+        Variable.instances[name] = this;
     }
 
     is_number()
@@ -158,15 +191,22 @@ class Variable
 
 Variable.eval_with_proxy = (code) =>
 {
-    Variable.references = [];
-    let retry = true;
+    let references = new Set(), retry = true;
+    let proxy = new Proxy(Variable.instances, {
+        get(target, key) {
+            if (typeof key === "string")
+                references.add(key);
+            return 0;
+        }
+    });
+
     let value;
     while (retry)
     {
         retry = false;
         try
         {
-            value = eval(`with (Variable.proxy) {${code}}`);
+            value = eval(`with (proxy) {${code}}`);
         }
         catch (error)
         {
@@ -178,11 +218,11 @@ Variable.eval_with_proxy = (code) =>
             // Create missing variable and retry
             let name = error.message.substr(0, split);
                 Variable.get(name);
+            references.clear();
             retry = true;
         }
     }
 
-    let dependencies = [...new Set([...Variable.references])];
-    Variable.references = [];
+    let dependencies = [...references];
     return [value, dependencies];
 };

@@ -2,23 +2,20 @@ class Plot
 {
     static tab_list = new TabList('#plot_list', Plot, true);
 
-    constructor(func, settings)
+    constructor(settings, name)
     {
-        if (func == undefined) func = []
-        if (!Array.isArray(func)) func = [func];
-        for (let i = 0; i < func.length; i++)
-        {
-            if (func[i] instanceof Function)
-                func[i] = func[i].name;
-        }
+        this.name = name || "Plot " + (Plot.tab_list.tabs.length + 1);
 
-        this.name = "Plot " + (Plot.tab_list.tabs.length + 1);
-        this.functions = func;
+        this.functions = settings.functions || [];
+        for (let i = 0; i < this.functions.length; i++)
+        {
+            if (this.functions[i] instanceof Function)
+                this.functions[i] = this.functions[i].name;
+        }
 
         this.axis_1 = settings.axis_1;
         this.axis_2 = settings.axis_2;
-        for (let name of Object.keys(settings.values))
-            Variable.get(name, settings.values[name]);
+        this.dimensions = settings.dimensions;
 
         Plot.tab_list.add_element(this);
     }
@@ -43,12 +40,13 @@ class Plot
         let params = [];
         for (let func of this.functions)
             params = params.concat(Expression.instances[func].parameters);
-        return [...new Set([...params])]; // Remove duplicates
+        return [...new Set(params)]; // Remove duplicates
     }
 
     on_display(parent)
     {
-        this.element = document.createElement("div");
+        if (this.element === undefined)
+            this.element = document.createElement("div");
         parent.appendChild(this.element);
 
         let grid = document.createElement("div");
@@ -56,15 +54,16 @@ class Plot
 
         // Build sliders
         grid.style = "display: flex; flex-wrap: wrap; gap: 4px 20px;";
-        for (let name of this.get_parameters())
+        let variables = this.get_parameters().map(v => Variable.get(v));
+        let axis = [Variable.get(this.get_axis_1()), Variable.get(this.get_axis_2())];
+        for (let variable of Variable.get_dependencies(variables, axis))
         {
-            let variable = Variable.get(name);
-            if (variable.is_number() && !this.is_axis(name))
-            {
-                let slider = variable.get_slider();
-                slider.style = "width: 280px";
-                grid.appendChild(slider);
-            }
+            if (!variable.is_number())
+                continue;
+
+            let slider = variable.get_slider();
+            slider.style = "width: 280px";
+            grid.appendChild(slider);
         }
 
         this.display_plot();
@@ -76,8 +75,8 @@ class Plot
         let traces = this.functions.map(name => this.gen_trace(name));
 
         // Build layout
-        let layout = { width: this.element.parentNode.clientWidth - 30 };
-        let make_axis = (text, range) => ({ range: [range.min-0.1, range.max+0.1], title: {text} });
+        let layout = { width: this.element.parentNode.clientWidth - 30, uirevision: true };
+        let make_axis = (text, range) => ({ /*range: [range.min-0.1, range.max+0.1],*/ title: {text} });
         if (this.get_dimensions() == 0)
         {
             let axis_1 = this.get_axis_1();

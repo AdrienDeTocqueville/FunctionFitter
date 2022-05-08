@@ -1,4 +1,4 @@
-var $settings, $projects;
+let $settings = {}, $projects;
 var print = console.log;
 let loaded_project = null;
 
@@ -6,7 +6,7 @@ $projects = load_projects();
 refresh_project_list();
 
 set_theme(localStorage.getItem('theme'));
-deserialize({});
+deserialize();
 
 // Modal
 function project_modal_content (callback)
@@ -48,6 +48,7 @@ document.querySelector("#project-name").onclick = () => {
 }
 
 document.querySelector("#save").onclick = () => {
+    loaded_project = "Area";
     if (loaded_project == null)
     {
         Modal.open("Save As", project_modal_content(save_project));
@@ -58,7 +59,7 @@ document.querySelector("#save").onclick = () => {
 }
 
 // Theme
-document.querySelector("#switch-theme").onclick = () => set_theme(1 - $settings.theme);
+document.querySelector("#switch-theme").onclick = () => set_theme();
 
 // Serialization
 function load_projects()
@@ -90,50 +91,24 @@ function delete_project(name)
 {
     delete $projects[name];
     if (name == loaded_project)
-        deserialize({});
+        deserialize();
 
     save_projects();
 }
 
-function default_settings()
-{
-    return {
-        graph_dimensions: 2,
-        resolution: 64,
-        settings: {},
-        models: [],
-        references: [],
-        parameters: {},
-        variables: {},
-    };
-}
-
 function serialize()
 {
-    let serialized = default_settings();
-    serialized.settings = $settings.settings;
+    let serialized = {
+        settings: {},
+        expressions: [],
+        variables: [],
+        models: {},
+        plots: {},
+    };
 
-    for (let name in $settings.models)
+    for (let name in $settings)
     {
-        let src = $settings.models[name];
-        serialized.models.push({
-            ref: src.ref,
-            code: src.func.toString(),
-        });
-    }
-
-    for (let name of $settings.references)
-    {
-        let src = $settings.plots[name];
-        serialized.references.push({
-            display: src.display,
-            code: src.func.toString(),
-        });
-    }
-
-    for (let name in $settings.settings)
-    {
-        let src = $settings.settings[name];
+        let src = $settings[name];
         if (src.type == 'lut')
         {
             serialized.settings[name] = {
@@ -144,91 +119,106 @@ function serialize()
         }
         else
         {
-            serialized.settings[name] = src;
+            let other = {...src};
+            other.settings = {...src.settings};
+            delete other.settings.label;
+            delete other.settings.id;
+            if (Object.keys(settings).length !== 0)
+                delete other.settings;
+            serialized.settings[name] = other;
         }
     }
 
-    if ($settings.parameters)
+    for (let name in Expression.instances)
     {
-        for (let src of $settings.parameters)
-            serialized.parameters[src.name] = {
-                value: src.value,
-                range: src.range,
-                resolution: src.resolution
-            };
+        let expr = Expression.instances[name];
+        if (expr.is_function)
+            serialized.expressions.push(expr.source);
     }
 
-    for (let name in $settings.variables)
-        serialized.variables[name] = $settings.variables[name].value;
+    let variables = new Set()
+    for (let name in Variable.instances)
+        variables.add(Variable.instances[name]);
+    variables = Variable.sort_by_dependency(variables);
+    for (let variable of variables)
+    {
+        serialized.variables.push({
+            name: variable.name,
+            min: variable.min,
+            max: variable.max,
+            res: variable.resolution,
+            value: variable.value,
+        });
+    }
+
+    for (let model of Fitting.tab_list.tabs)
+    {
+        serialized.models[model.name] = {
+            constant: [...model.constant],
+            value: model.expression.source,
+            ref: model.ref,
+        };
+    }
+
+    for (let plot of Plot.tab_list.tabs)
+    {
+        serialized.plots[plot.name] = {
+            axis_1: plot.axis_1,
+            axis_2: plot.axis_2,
+            dimensions: plot.dimensions,
+            functions: plot.functions,
+        };
+    }
 
     return serialized;
 }
 
 function deserialize(data)
 {
-    data = data || {};
-    Object.setPrototypeOf(data, default_settings());
-
-    loaded_project = data.name;
-
     // Unload current project
-
     document.querySelector("#settings_list").innerHTML = "";
     document.querySelector("#function_list").innerHTML = "";
 
     if ($settings)
     {
-        for (let name in $settings.settings)
+        for (let name in $settings)
             delete window[name];
-        for (let name in $settings.plots)
+        for (let name in Expression.instances)
             delete window[name];
     }
 
-    $settings = {
-        plots: {},
-        settings: {},
-        functions: {},
-        parameter_names: [],
-        dimensions: undefined,
-        parameters: undefined,
-        variables: {},
-        sliders: [],
-        sliderElement: document.querySelector('#sliders'),
-    };
+    $settings = {};
+    Expression.instances = {};
+    Variable.instances = {};
+    Fitting.tab_list.clear();
+    Plot.tab_list.clear();
+
+    // Update name
+    loaded_project = data?.name;
+    document.querySelector("#project-name").innerText = loaded_project || "Unnamed Project";
 
     // Load
-
-    document.querySelector("#project-name").innerText = loaded_project || "Unnamed Project";
+    if (data == null)
+        return false;
 
     for (let name in data.settings)
     {
         let src = data.settings[name];
         if (src.type == 'lut') add_lut(name, src.url, src.bilinear);
-        else add_setting(name, src.type, src.initial_value, src.settings);
+        else add_setting(name, src.type, src.value, src.settings);
     }
 
-    for (let src of data.references)
-        add_reference(src.code, src.display, false);
+    for (let src of data.expressions)
+        new Expression(src);
 
-    for (let name in data.variables)
-        get_or_create_variable(name, data.variables[name]);
+    for (let variable of data.variables)
+        new Variable(variable.name, variable);
 
-    for (let src of data.models)
-        add_model(src.code, src.ref);
+    for (let name in data.models)
+        new Fitting(data.models[name], name);
 
-    if ($settings.parameters != undefined)
-    {
-        for (let name in data.parameters)
-        {
-            for (let param of $settings.parameters)
-            {
-                if (param.name == name)
-                {
-                    param.value = data.parameters[name].value;
-                    param.range = data.parameters[name].range;
-                    param.resolution = data.parameters[name].resolution;
-                }
-            }
-        }
-    }
+    for (let name in data.plots)
+        new Plot(data.plots[name], name);
+
+    return true;
 }

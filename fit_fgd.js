@@ -1,7 +1,5 @@
 if (!deserialize($projects["FGD"]))
 {
-    deserialize({});
-
     function model_f (x, a0, b0, c0, a1, b1, c1)
     {
         let [NdotV, roughness] = x;
