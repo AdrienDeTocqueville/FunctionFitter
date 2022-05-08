@@ -48,7 +48,6 @@ document.querySelector("#project-name").onclick = () => {
 }
 
 document.querySelector("#save").onclick = () => {
-    loaded_project = "Area";
     if (loaded_project == null)
     {
         Modal.open("Save As", project_modal_content(save_project));

@@ -12,10 +12,11 @@ class Variable
 
     static get_dependencies(variables, ignore)
     {
-        ignore = new Set(ignore || []);
-        let dependencies = new Set();
-        let track_dependencies = (variable) => {
-            if (ignore.has(variable)) return;
+        ignore = new Set((ignore || []).map(v => (v instanceof Variable) ? v.name : v));
+
+        function track_dependencies(variable)
+        {
+            if (ignore.has(variable.name)) return;
             if (dependencies.has(variable)) return;
 
             dependencies.add(variable);
@@ -23,25 +24,26 @@ class Variable
                 track_dependencies(Variable.get(d));
         }
 
-        variables.forEach(track_dependencies);
+        let dependencies = new Set();
+        variables.forEach(v => { track_dependencies(v instanceof Variable ? v : Variable.get(v)); });
         return dependencies;
     }
 
-    static sort_by_dependency(variables, defined)
+    static sort_by_dependency(variables, ignore)
     {
-        if (defined) defined = new Set(defined.map(v => v.name));
-        defined = defined || new Set();
+        ignore = new Set((ignore || []).map(v => (v instanceof Variable) ? v.name : v));
+        variables = new Set([...variables].map(v => (v instanceof Variable) ? v : Variable.get(v)));
 
         let definitions = [], has_change;
         do {
             has_change = false;
             for (const variable of variables)
             {
-                if (variable.dependencies.some(v => !defined.has(v)))
+                if (variable.dependencies.some(v => !ignore.has(v)))
                     continue;
 
                 definitions.push(variable);
-                defined.add(variable.name);
+                ignore.add(variable.name);
                 has_change = true;
 
                 variables.delete(variable);
@@ -56,7 +58,7 @@ class Variable
 
         this.min    = values?.min     || 0;
         this.max    = values?.max     || 1;
-        this.resolution = values?.res || 16;
+        this.resolution = values?.res || 32;
 
         if (values?.__proto__ === Object.prototype)
             values = values.value;
@@ -67,11 +69,6 @@ class Variable
     is_number()
     {
         return typeof this.value === "number";
-    }
-
-    compile()
-    {
-        return this.value;
     }
 
     set_value(value)
@@ -114,6 +111,7 @@ class Variable
         slider.value = this.value;
         slider.oninput = () => {
             this.value = slider.valueAsNumber;
+            if (show_label) value_label.innerText = this.value;
             Plot.repaint();
         }
         slider.onchange = repaint_all;

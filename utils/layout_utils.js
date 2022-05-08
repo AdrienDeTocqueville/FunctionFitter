@@ -180,7 +180,7 @@ function load_lut_async(url, name, canvas)
             context.drawImage(img, 0, 0);
             $settings[name].image = context.getImageData(0, 0, img.width, img.height);
 
-            refresh_all_plots();
+            Plot.repaint();
             resolve($settings[name]);
         };
         img.onerror = reject;
@@ -244,17 +244,17 @@ function sample_lut(name, x, y, channel)
 
     let low = load_lut(x_low, y_low);
     if (x != x_low)
-        low = lerp(low, x_lerp, load_lut(x_low+1, y_low));
+        low = lerp(low, load_lut(x_low+1, y_low), x_lerp);
 
     let high = low;
     if (y != y_low)
     {
         high = load_lut(x_low, y_low+1);
         if (x != x_low)
-            high = lerp(high, x_lerp, load_lut(x_low+1, y_low+1));
+            high = lerp(high, load_lut(x_low+1, y_low+1), x_lerp);
     }
 
-    return lerp(low, y - y_low, high);
+    return lerp(low, high, y - y_low);
 }
 
 /// SETTINGS

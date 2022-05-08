@@ -89,20 +89,21 @@ class Expression
         });
     }
 
-    compile(axis_1, axis_2)
+    compile(axes)
     {
         let definitions = "";
-        let params = this.parameters.map(p => Variable.get(p));
-        let dependencies = Variable.get_dependencies(params, [axis_1, axis_2]);
+        let dependencies = Variable.get_dependencies(this.parameters, axes);
+        axes = axes.map(v => (v instanceof Variable) ? v.name : v);
+
         if (dependencies.size != 0)
         {
-            let sorted = Variable.sort_by_dependency(dependencies, [axis_1, axis_2]);
+            let sorted = Variable.sort_by_dependency(dependencies, axes);
             definitions = `let ${sorted.map(v => v.name + "=" + v.value).join(',')};`;
         }
 
         let body = !this.is_function ? `${definitions} return ${this.source}` :
             `${definitions} return ${this.name}(${this.parameters.join(',')})`
-        return new Function([axis_1.name, axis_2?.name], body);
+        return new Function(axes, body);
     }
 }
 

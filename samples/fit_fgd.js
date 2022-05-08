@@ -49,12 +49,18 @@ if (!deserialize($projects["FGD"]))
 
     async function main()
     {
-        await add_lut("FGD_LUT", "FGD_64.png");
+        await add_lut("FGD_LUT", "samples/FGD_64.png");
         add_setting("TRANSFORM_FGD", "checkbox", true);
         add_setting("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
-        add_reference(fgd_ref, true);
-        add_reference(fgd_lazarov, false);
-        add_model(model_f);
+
+        new Expression(fgd_ref);
+        new Expression(fgd_lazarov);
+
+        new Fitting({ref: fgd_ref});
+
+        new Plot({
+            functions: [fgd_ref, fgd_lazarov],
+        });
     }
     main()
 }

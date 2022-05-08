@@ -54,9 +54,8 @@ class Plot
 
         // Build sliders
         grid.style = "display: flex; flex-wrap: wrap; gap: 4px 20px;";
-        let variables = this.get_parameters().map(v => Variable.get(v));
-        let axis = [Variable.get(this.get_axis_1()), Variable.get(this.get_axis_2())];
-        for (let variable of Variable.get_dependencies(variables, axis))
+        let axes = [this.get_axis_1(), this.get_axis_2()];
+        for (let variable of Variable.get_dependencies(this.get_parameters(), axes))
         {
             if (!variable.is_number())
                 continue;
@@ -137,46 +136,46 @@ class Plot
 
     gen_trace(name)
     {
-        let axis_1 = Variable.get(this.get_axis_1());
-        let axis_2 = Variable.get(this.get_axis_2());
+        let axes = this.get_dimensions() == 0 ? [Variable.get(this.get_axis_1())] :
+            [Variable.get(this.get_axis_1()), Variable.get(this.get_axis_2())];
 
         let expr = Expression.instances[name];
-        let px = this.gen_trace_inputs(axis_1, axis_2);
+        let px = this.gen_trace_inputs(...axes);
 
-        let model = expr.compile(axis_1, axis_2);
+        let model = expr.compile(axes);
         let py = new Array(px.length);
         for (let i = 0; i < px.length; i++)
             py[i] = model(...px[i]);
 
         let trace;
-        if (axis_2 == undefined)
+        if (this.get_dimensions() == 0)
         {
             trace = {
                 type: "line",
-                x: new Array(axis_1.resolution),
+                x: new Array(axes[0].resolution),
                 y: py,
             };
 
-            for (let i = 0; i < axis_1.resolution; i++)
+            for (let i = 0; i < axes[0].resolution; i++)
                 trace.x[i] = px[i][0];
         }
         else
         {
             trace = {
                 type: "surface",
-                x: new Array(axis_1.resolution),
-                y: new Array(axis_2.resolution),
-                z: new Array(axis_1.resolution),
+                x: new Array(axes[0].resolution),
+                y: new Array(axes[1].resolution),
+                z: new Array(axes[0].resolution),
             };
 
-            for (let i = 0; i < axis_1.resolution; i++)
+            for (let i = 0; i < axes[0].resolution; i++)
             {
                 trace.x[i] = px[i][0];
-                trace.y[i] = px[i*axis_2.resolution][1];
+                trace.y[i] = px[i*axes[1].resolution][1];
 
-                trace.z[i] = new Array(axis_2.resolution);
-                for (let j = 0; j < axis_2.resolution; j++)
-                    trace.z[i][j] = py[i*axis_2.resolution + j];
+                trace.z[i] = new Array(axes[1].resolution);
+                for (let j = 0; j < axes[1].resolution; j++)
+                    trace.z[i][j] = py[i*axes[1].resolution + j];
             }
         }
 
@@ -278,6 +277,6 @@ class Plot
     static repaint()
     {
         let active = Plot.tab_list.get_active_element();
-        active.display_plot();
+        active?.display_plot();
     }
 }

@@ -1,5 +1,3 @@
-// C:\Users\adrien.tocqueville\AppData\Local\Programs\Opera\launcher.exe --allow-file-access-from-files
-
 function ReverseBits32(bits)
 {
     bits = (bits << 16) | (bits >>> 16);
