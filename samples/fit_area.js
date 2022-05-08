@@ -123,4 +123,6 @@ if (!deserialize($projects["Area"]))
         functions: [area_light, "model_1"],
         axis_1: 'z'
     });
+
+    set_project_name("Area");
 }

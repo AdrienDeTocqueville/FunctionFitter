@@ -15,7 +15,7 @@ class Plot
 
         this.axis_1 = settings.axis_1;
         this.axis_2 = settings.axis_2;
-        this.dimensions = settings.dimensions;
+        this.dimensions = settings.dimensions || (this.axis_2 ? 1 : 0);
 
         Plot.tab_list.add_element(this);
     }
@@ -75,12 +75,12 @@ class Plot
 
         // Build layout
         let layout = { width: this.element.parentNode.clientWidth - 30, uirevision: true };
-        let make_axis = (text, range) => ({ /*range: [range.min-0.1, range.max+0.1],*/ title: {text} });
+        let make_axis = (text, range) => ({ range: [range.min, range.max], title: {text} });
         if (this.get_dimensions() == 0)
         {
             let axis_1 = this.get_axis_1();
             layout.xaxis = make_axis(axis_1, Variable.get(axis_1));
-            layout.yaxis = { title: "y" };
+            layout.yaxis = { title: "" };
         }
         else
         {
@@ -89,49 +89,11 @@ class Plot
             layout.scene = {
                 xaxis: make_axis(axis_1, Variable.get(axis_1)),
                 yaxis: make_axis(axis_2, Variable.get(axis_2)),
-                zaxis: { title: "y" },
+                zaxis: { title: "" },
             }
         }
 
         Plotly.react(this.element, traces, layout);
-    }
-
-    gen_trace_inputs(axis_1, axis_2)
-    {
-        let num_points = axis_1.resolution, dimensions = 1;
-
-        if (axis_2 != undefined)
-        {
-            num_points *= axis_2.resolution;
-            dimensions++;
-        }
-
-        let px = new Array(num_points);
-        for (let i = 0; i < num_points; i++)
-            px[i] = new Array(dimensions);
-
-        if (axis_2 == undefined)
-        {
-            let step = (axis_1.max - axis_1.min) / (axis_1.resolution - 1);
-            for (let j = 0; j < axis_1.resolution; j++)
-                px[j][0] = axis_1.min + step * j;
-        }
-        else
-        {
-            let step_1 = (axis_1.max - axis_1.min) / (axis_1.resolution - 1);
-            let step_2 = (axis_2.max - axis_2.min) / (axis_2.resolution - 1);
-            for (let j = 0; j < axis_2.resolution; j++)
-            {
-                for (let k = 0; k < axis_1.resolution; k++)
-                {
-                    let p = j * axis_1.resolution + k;
-                    px[p][0] = axis_1.min + step_1 * k;
-                    px[p][1] = axis_2.min + step_2 * j;
-                }
-            }
-        }
-
-        return px;
     }
 
     gen_trace(name)
@@ -139,45 +101,46 @@ class Plot
         let axes = this.get_dimensions() == 0 ? [Variable.get(this.get_axis_1())] :
             [Variable.get(this.get_axis_1()), Variable.get(this.get_axis_2())];
 
-        let expr = Expression.instances[name];
-        let px = this.gen_trace_inputs(...axes);
+        let model = Expression.instances[name].compile(axes);
 
-        let model = expr.compile(axes);
-        let py = new Array(px.length);
-        for (let i = 0; i < px.length; i++)
-            py[i] = model(...px[i]);
+        function linspace(v)
+        {
+            let values = new Array(v.resolution);
+            let step = (v.max - v.min) / (v.resolution - 1);
+            for (let i = 0; i < v.resolution; i++)
+                values[i] = v.min + step * i;
+            return values;
+        }
 
         let trace;
         if (this.get_dimensions() == 0)
         {
             trace = {
                 type: "line",
-                x: new Array(axes[0].resolution),
-                y: py,
+                x: linspace(axes[0]),
+                y: new Array(axes[0].resolution),
             };
 
             for (let i = 0; i < axes[0].resolution; i++)
-                trace.x[i] = px[i][0];
+                trace.y[i] = model(trace.x[i]);
         }
         else
         {
             trace = {
                 type: "surface",
-                x: new Array(axes[0].resolution),
-                y: new Array(axes[1].resolution),
-                z: new Array(axes[0].resolution),
+                x: linspace(axes[0]),
+                y: linspace(axes[1]),
+                z: new Array(axes[1].resolution),
             };
 
-            for (let i = 0; i < axes[0].resolution; i++)
+            for (let j = 0; j < axes[1].resolution; j++)
             {
-                trace.x[i] = px[i][0];
-                trace.y[i] = px[i*axes[1].resolution][1];
-
-                trace.z[i] = new Array(axes[1].resolution);
-                for (let j = 0; j < axes[1].resolution; j++)
-                    trace.z[i][j] = py[i*axes[1].resolution + j];
+                trace.z[j] = new Array(axes[0].resolution);
+                for (let i = 0; i < axes[0].resolution; i++)
+                    trace.z[j][i] = model(trace.x[i], trace.y[j]);
             }
         }
+        print(trace);
 
         trace.name = name;
         return trace;

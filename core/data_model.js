@@ -26,7 +26,7 @@ function project_modal_content (callback)
     content.querySelector("button").onclick = () => {
         let name = document.querySelector("#modal input").value;
         if (/^\s*$/.test(name)) return; // empty
-        document.querySelector("#project-name").innerText = loaded_project = name;
+        set_project_name(name);
         Modal.close();
         callback();
     }
@@ -61,6 +61,11 @@ document.querySelector("#save").onclick = () => {
 document.querySelector("#switch-theme").onclick = () => set_theme();
 
 // Serialization
+function set_project_name(name)
+{
+    document.querySelector("#project-name").innerText = loaded_project = name;
+}
+
 function load_projects()
 {
     let result = {};

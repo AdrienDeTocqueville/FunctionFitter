@@ -84,7 +84,7 @@ class Variable
         }
 
         this.dependencies = dependencies;
-        this.value = dependencies.length == 0 ? number : value;
+        this.value = dependencies.length == 0 ? clamp(number, this.min, this.max) : value;
         return true;
     }
 
@@ -105,7 +105,7 @@ class Variable
         slider.className = "form-range";
         slider.type = "range";
         slider.id = this.name + "-slider";
-        slider.step = (this.max-this.min) / this.resolution;
+        slider.step = (this.max-this.min) / (this.resolution - 1);
         slider.min = this.min;
         slider.max = this.max
         slider.value = this.value;
@@ -179,9 +179,9 @@ class Variable
                 id="${this.name}-res" value="${this.resolution}">
         `;
 
-        form[0].onchange = (e) => { this.min = min(e.target.valueAsNumber, this.max); }
-        form[1].onchange = (e) => { this.max = max(e.target.valueAsNumber, this.min); }
-        form[2].onchange = (e) => { this.resolution = max(e.target.valueAsNumber, 1); }
+        form[0].onchange = (e) => { this.min = min(e.target.valueAsNumber, this.max); Plot.repaint(); }
+        form[1].onchange = (e) => { this.max = max(e.target.valueAsNumber, this.min); Plot.repaint(); }
+        form[2].onchange = (e) => { e.target.value = this.resolution = max(e.target.valueAsNumber, 2); Plot.repaint(); }
 
         return form;
     }

@@ -100,8 +100,7 @@ class Fitting
         let axis_count = axes.length;
 
         // Build dataset
-        let dataset = this.build_dataset(axes, ref.function);
-        print(dataset);
+        let dataset = this.build_dataset(axes, ref.compile(axes));
 
         // Compute initial values
         let initial_values = [];
@@ -135,7 +134,12 @@ class Fitting
                 delete this.worker;
 
             for (let i = axis_count; i < axes.length; i++)
-                axes[i].set_value(event.data.payload[i - axis_count]);
+            {
+                let new_value = event.data.payload[i - axis_count];
+                if (new_value > axes[i].max) axes[i].max = Math.ceil(new_value/10)*10;
+                if (new_value < axes[i].min) axes[i].min = Math.floor(new_value/10)*10;
+                axes[i].set_value(new_value);
+            }
 
             repaint_all();
             // TODO: compute MSE

@@ -61,6 +61,8 @@ if (!deserialize($projects["FGD"]))
         new Plot({
             functions: [fgd_ref, fgd_lazarov],
         });
+
+        set_project_name("FGD");
     }
     main()
 }

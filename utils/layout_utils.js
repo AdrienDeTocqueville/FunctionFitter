@@ -276,7 +276,7 @@ function add_setting(name, type, initial_value, settings = {})
     let [input, label] = create_input(type, initial_value, settings, (value) => {
         window[name] = value;
         $settings[name].value = value;
-        refresh_all_plots();
+        Plot.repaint();
     });
 
     label.style = "margin-right: 30px";
@@ -427,7 +427,7 @@ function create_input(type, value, settings, onChange)
 
         let [box, box_label] = create_input("checkbox", settings.bilinear, {label: "Bilinear Filtering", id: "bilinear-" + name}, () => {
             settings.bilinear = box.checked;
-            refresh_all_plots();
+            Plot.repaint();
         });
 
         let div = document.createElement("div");
