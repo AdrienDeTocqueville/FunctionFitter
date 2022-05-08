@@ -1,11 +1,4 @@
-Split(["#controls", "#main", "#settings"], {sizes: [20, 40, 40]});
-
-let default_func = `function new_function(x, y)
-{
-    return x + y;
-}`;
-
-//hook_add_buttons();
+Split(["#settings", "#plots", "#fitting"], {sizes: [33, 33, 33]});
 
 /// LISTS
 
@@ -32,7 +25,7 @@ function add_list_element(list, style, children, on_delete)
 }
 
 let Modal = {
-    open: (title, content) => {
+    open: (title, content, on_close) => {
         let modal = document.createElement("div");
         modal.id = "modal";
         modal.innerHTML = `
@@ -47,8 +40,10 @@ let Modal = {
         document.body.appendChild(modal);
         let h5 = modal.querySelector("h5");
         h5.parentNode.insertBefore(content, h5.nextSibling);
+
+        Modal.on_close = on_close;
     },
-    close: () => { document.querySelector("#modal").remove(); }
+    close: () => { Modal.on_close?.(); document.querySelector("#modal").remove(); }
 };
 
 class TabList
@@ -68,7 +63,7 @@ class TabList
         li.className = "nav-item nav-link active";
         li.innerText = "+";
         li.tabIndex = -1;
-        li.onclick = () => { this.add_element(new elem_type()); }
+        li.onclick = () => { new elem_type(); }
 
         this.active_tab = li;
 
@@ -81,19 +76,23 @@ class TabList
 
         if (has_settings)
         {
-            this.element.style = "position: relative";
-            this.ul.style = "max-width: calc(100% - 20px)";
             let settings = document.createElement("i");
             settings.className = "fa-solid fa-ellipsis-vertical";
-            settings.style = "position: absolute; top: 12px; right: 0px; width: 20px; text-align: center";
             settings.onclick = () => {
                 if (this.active_tab.tabIndex == -1) return;
                 let elem = this.tabs[this.active_tab.tabIndex];
                 elem.on_settings();
             }
+
+            settings.style = "position: absolute; top: 12px; right: -5px; width: 20px; text-align: center";
+            this.ul.style = "max-width: calc(100% - 15px)";
+            this.element.style = "position: relative";
             this.element.appendChild(settings);
         }
     }
+
+    get_active_element() { return this.tabs[this.active_tab.tabIndex]; }
+    repaint() { this.content.innerHTML = ""; this.get_active_element().on_display(this.content); }
 
     add_element(elem)
     {
@@ -105,17 +104,13 @@ class TabList
             this.active_tab.classList.remove("active");
             this.active_tab = li;
             this.active_tab.classList.add("active");
-
-            this.content.innerHTML = "";
-            elem.on_display(this.content);
+            this.repaint();
         }
 
         this.ul.insertBefore(li, this.ul.children[this.ul.childElementCount-1]);
 
         this.tabs.push(elem);
         li.onclick();
-        if (elem.on_settings != undefined)
-            elem.on_settings();
     }
 }
 
@@ -136,6 +131,7 @@ class Table
             row.appendChild(elem);
         }
 
+        row.children[0].style = "width: 1% !important; white-space: nowrap !important;";
         this.element = table;
     }
 
@@ -154,54 +150,6 @@ class Table
             row.appendChild(elem);
         }
         body.appendChild(row);
-    }
-}
-
-function hook_add_buttons()
-{
-    document.querySelector("#add_function").onclick = () => {
-        add_reference(default_func, false);
-    }
-
-    let editor = null;
-    document.querySelector("#edit_variables").onclick = () => {
-        let variable_list = document.querySelector("#variable_list");
-        if (editor == null)
-        {
-            let values = "", count = 0;
-            for (let name in $settings.variables)
-            {
-                count++;
-                values += `${name} = ${$settings.variables[name].value}\n`;
-            }
-
-            editor = document.createElement("textarea");
-            editor.rows = count + 4;
-            editor.style = "width: 100%";
-            editor.value = values;
-            variable_list.parentNode.insertBefore(editor, variable_list);
-            variable_list.style = "display: none";
-        }
-        else
-        {
-            let values = editor.value.split(/[\r\n]+/);
-            for (let value of values)
-            {
-                let parts = value.split(/\s*=\s*/);
-                if (parts.length != 2) continue;
-                let variable = $settings.variables[parts[0].trim()];
-                if (variable == null) continue;
-                variable.value = parseFloat(parts[1].trim());
-                variable.refresh_input();
-            }
-
-            for (let name in $settings.models)
-                $settings.models[name].rebuild_model();
-
-            editor.remove();
-            editor = null;
-            variable_list.style = "display: block";
-        }
     }
 }
 
@@ -333,93 +281,6 @@ function add_setting(name, type, initial_value, settings = {})
     });
 }
 
-/// FUNCTIONS
-
-function parse_parameters(code)
-{
-    let STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
-    let FN_ARGS = /^function\s*[^\(]*\(\s*([^\)]*)\)/m;
-    let FN_ARG_SPLIT = /,/;
-    fnText = code.replace(STRIP_COMMENTS, '');
-    argDecl = fnText.match(FN_ARGS);
-    let parameters = argDecl[1].split(FN_ARG_SPLIT);
-    for (let i = 0; i < parameters.length; i++)
-        parameters[i] = parameters[i].trim();
-    return parameters;
-}
-
-function create_code_editor(code, div, min_line_count, onChange)
-{
-    let line_count = Math.min(min_line_count, code.split(/\r\n|\r|\n/).length - 1);
-    div.style = `margin-top: 5px; height: ${line_count*17 + 8}px`;
-    div.className = "editor";
-    div.innerHTML = code;
-
-    let editor = ace.edit(div);
-    editor.setTheme("ace/theme/monokai");
-    editor.session.setMode("ace/mode/javascript");
-    editor.renderer.setScrollMargin(4, 0);
-
-    let refresher;
-    editor.session.on('change', function(delta) {
-        clearTimeout(refresher);
-        refresher = setTimeout(function() {
-            for (let annotation of editor.getSession().getAnnotations())
-                if (annotation.type == "error") return;
-            onChange(editor.getValue());
-        }, 500);
-    });
-}
-
-function validate_reference(code)
-{
-    try {
-        let func = eval("(" + code + ")");
-        func(...new Array($settings.dimensions - 1).fill(0));
-        return func;
-    } catch (error) { console.error(error); }
-}
-
-function add_function(code, display, refresh = true)
-{
-    let fn;
-    if (code instanceof Function)
-    {
-        fn = code;
-        code = fn.toString();
-    }
-    else
-    {
-        try {
-            fn = eval("(" + code + ")");
-        } catch (error) {
-            console.error(error);
-            return;
-        }
-    }
-
-    let parameters = parse_parameters(code);
-
-    let editor = document.createElement("div");
-    editor.id = "editor-" + fn.name;
-
-    add_list_element('#function_list', "", [editor]);
-
-    create_code_editor(code, editor, 15, (new_code) => {
-        if ($settings.plots[fn.name].display == false)
-            return;
-
-        let new_func = validate_reference(new_code);
-        if (new_func == null) return;
-
-        $settings.plots[fn.name].func = new_func;
-        refresh_plot(fn.name);
-    });
-
-    window[fn.name] = fn;
-    $settings.functions[fn.name] = {parameters, func: fn};
-}
-
 /// SLIDERS
 
 function generate_sliders(parameters)
@@ -463,157 +324,6 @@ function generate_sliders(parameters)
     ensure_sliders();
 }
 
-function rebuild_ranges()
-{
-    ensure_sliders();
-    refresh_all_plots();
-}
-
-function ensure_sliders()
-{
-    if ($settings.dimensions == undefined)
-        return;
-    if ($settings.dimensions < $settings.graph_dimensions)
-        $settings.graph_dimensions = $settings.dimensions;
-    let num_sliders = $settings.dimensions - $settings.graph_dimensions;
-
-    // Disable unndeed sliders
-    for (let i = num_sliders; i < $settings.sliders.length; i++)
-        $settings.sliders[i].active = -1;
-
-    $settings.sliders = new Array(num_sliders);
-    for (let i = 0; i < num_sliders; i++)
-    {
-        let active = null;
-        for (let slider of $settings.parameters)
-        {
-            if (slider.active == i)
-            {
-                active = slider;
-                break;
-            }
-            if (slider.active == -1 && active == null)
-                active = slider;
-        }
-        $settings.sliders[i] = active;
-        active.active = i;
-    }
-
-    $settings.sliderElement.innerHTML = "";
-    for (let idx = 0; idx < num_sliders; idx++)
-    {
-        if (idx != 0)
-            $settings.sliderElement.append(document.createElement("hr"));
-
-        let i = idx; // copy for capture
-        let div = document.createElement("div");
-        div.style = "display: flex; margin-bottom: 8px";
-
-        let html = "";
-        let dropdown = document.createElement("select");
-        dropdown.style = "width: 110px; margin-right: 10px";
-        dropdown.className = "form-select form-select-sm";
-        for (let j = 0; j < $settings.parameters.length; j++)
-        {
-            let param = $settings.parameters[j];
-            let selected = (param.active == i) ? "selected" : "";
-            if (param.active == -1 || param.active == i)
-                html += `<option value='${j}' ${selected}>${param.name}</option>`;
-        }
-        dropdown.innerHTML = html;
-        dropdown.onchange = () => {
-            let selected = parseInt(dropdown.value);
-
-            $settings.sliders[i].active = -1;
-            $settings.sliders[i] = $settings.parameters[selected];
-            $settings.sliders[i].active = i;
-
-            build_slider();
-            refresh_all_plots();
-        };
-
-        let create_label = (content) => {
-            let label = document.createElement("div");
-            label.innerText = content;
-            return label;
-        };
-
-        let value = truncate($settings.sliders[i].value, 3);
-        let value_label = create_label(value);
-        value_label.style = "padding: 2px";
-
-        div.append(dropdown, value_label);
-        $settings.sliderElement.append(div);
-
-        let sliderDiv = document.createElement("div");
-        sliderDiv.className = "single-line";
-
-        let build_slider = () => {
-            let slider = document.createElement("input");
-            slider.className = "form-range";
-            slider.type = "range";
-            slider.id = "slider-" + i;
-            slider.step = 0.001;
-            slider.min = $settings.sliders[i].range[0];
-            slider.max = $settings.sliders[i].range[1];
-            slider.value = value;
-            slider.oninput = () => {
-                value = truncate(slider.valueAsNumber, 3);
-                value_label.innerText = value;
-                $settings.sliders[i].value = value;
-                refresh_all_plots();
-            }
-
-            let min_label = create_label(slider.min);
-            let max_label = create_label(slider.max);
-            min_label.style = "cursor: pointer; padding-right: 6px";
-            max_label.style = "cursor: pointer; padding-left: 6px";
-            min_label.onclick = max_label.onclick = (e) => {
-                let form = document.createElement("form");
-                form.className = "single-line";
-                form.style = "margin-bottom: 0; justify-content: space-between;";
-                form.innerHTML = `
-                    <label for="slider-min">Min</label>
-                    <input id="slider-min" type="number"
-                        class="form-control" value="${$settings.sliders[i].range[0]}">
-
-                    <label for="slider-max">Max</label>
-                    <input id="slider-max" type="number"
-                        class="form-control" value="${$settings.sliders[i].range[1]}">
-
-                    <label for="slider-res">Res</label>
-                    <input id="slider-res" type="number"
-                        class="form-control" value="${$settings.sliders[i].resolution}">
-                `;
-
-                sliderDiv.replaceWith(form);
-
-                form[(e.path[0] == min_label)?0:1].focus();
-                form.onkeyup = (e) => {
-                    if (e.key == "Enter") e.target.blur();
-                };
-                form.addEventListener('focusout', (e) => {
-                    if (e.relatedTarget == null || e.relatedTarget.parentNode != form)
-                    {
-                        $settings.sliders[i].range[0] = form[0].valueAsNumber;
-                        $settings.sliders[i].range[1] = form[1].valueAsNumber;
-                        $settings.sliders[i].resolution = form[2].valueAsNumber;
-                        form.replaceWith(sliderDiv);
-                        build_slider();
-                    }
-                });
-            }
-
-            sliderDiv.innerHTML = "";
-            sliderDiv.append(min_label, slider, max_label);
-        }
-
-        build_slider();
-
-        $settings.sliderElement.append(sliderDiv);
-    }
-}
-
 /// PLOT
 
 function get_dataset(name)
@@ -653,54 +363,6 @@ function refresh_all_plots()
     for (let name in $settings.plots)
         _dirty_plot(name);
     draw_plots();
-}
-
-function draw_plots()
-{
-    if ($settings.dimensions == undefined)
-        return;
-
-    let traces = [];
-    for (let name in $settings.plots)
-    {
-        let plot = $settings.plots[name];
-        if (!plot.display) continue;
-        if (plot.data == null) evaluate_func(name);
-
-        plot.data.name = name;
-        traces.push(plot.data);
-    }
-
-    let param1, param2;
-    for (let i = 0; i < $settings.dimensions - 1; i++)
-    {
-        if ($settings.parameters[i].active == -1)
-        {
-            if (param1 == undefined) param1 = $settings.parameters[i];
-            else if (param2 == undefined) param2 = $settings.parameters[i];
-            else break;
-        }
-    }
-
-    let make_axis = (text, range) => ({ range: [range[0]-0.1, range[1]+0.1], title: {text} });
-
-    let layout = { title: "Main Plot" };
-    if ($settings.graph_dimensions == 2)
-    {
-        layout.xaxis = make_axis(param1.name, param1.range);
-        layout.yaxis = make_axis("y", [-0.1, 1.1]);
-    }
-    else
-    {
-        layout.scene = {
-            xaxis: make_axis(param1.name, param1.range),
-            yaxis: make_axis(param2.name, param2.range),
-            zaxis: make_axis("y", [-0.1, 1.1]),
-        }
-    }
-
-    let div = document.querySelector('#plot');
-    Plotly.react(div, traces, layout);
 }
 
 function evaluate_func(plot)
@@ -786,14 +448,89 @@ document.querySelector("#new-project").onclick = () => {
 
 /// Misc.
 
+function repaint_all()
+{
+    Plot.tab_list.repaint();
+    Fitting.tab_list.repaint();
+}
+
 function set_theme(theme)
 {
     let current = document.body.getAttribute('data-theme')
-    if (theme == current) return;
-
     theme = theme || (current == 'dark' ? 'light' : 'dark');
     localStorage.setItem('theme', theme);
     document.body.setAttribute('data-theme', theme);
+}
+
+function create_editor(content, on_change)
+{
+    let div = document.createElement("div");
+    div.className = "line-editor";
+    div.innerText = content;
+
+    let editor = ace.edit(div);
+    editor.setOptions({
+        maxLines: 1,
+        autoScrollEditorIntoView: true,
+        highlightActiveLine: false,
+        printMargin: false,
+        showGutter: false,
+        mode: "ace/mode/javascript",
+        //theme: "ace/theme/monokai"
+    });
+    // remove newlines in pasted text
+    editor.on("paste", function(e) {
+        e.text = e.text.replace(/[\r\n]+/g, " ");
+    });
+    // make mouse position clipping nicer
+    editor.renderer.screenToTextCoordinates = function(x, y) {
+        let pos = this.pixelToScreenCoordinates(x, y);
+        return this.session.screenToDocumentPosition(
+            Math.min(this.session.getScreenLength() - 1, Math.max(pos.row, 0)),
+            Math.max(pos.column, 0)
+        );
+    };
+
+    // Enter and Shift-Enter keys
+    let validate = () => {
+        let res = on_change(editor.getValue());
+        if (res === false) return set_color(undefined, true);
+        if (res === true) return repaint_all();
+        console.log("Invalid return value");
+    }
+    editor.commands.bindKey("Enter|Shift-Enter", validate);
+
+    // edit style when focused
+    let cursor = editor.renderer.$cursorLayer.element;
+    cursor.style.display = "none";
+
+    let set_color = (color, is_error) => {
+        let shadows = {active: "13 110 253 / 25%", default: "0 0 0 / 0%", error: "255 0 0 / 25%"};
+        let outlines = {active: "#86b7fe", default: "#ced4da", error: "red"};
+
+        if (is_error != undefined) set_color.error = is_error;
+        if (color != undefined) set_color.color = color;
+        let shadowColors = set_color.error ? {active: shadows.error, default: shadows.default} : shadows;
+        div.style.boxShadow = `0 0 0 0.25rem rgb(${shadowColors[set_color.color]})`;
+        div.style.outlineColor = outlines[set_color.error ? "error" : set_color.color];
+    }
+    set_color("default");
+
+    editor.on("focus", () => { cursor.style.display = "unset"; set_color("active"); });
+    editor.on("blur", validate);
+
+    // On change
+    let refresher;
+    editor.session.on('change', function(delta) {
+        clearTimeout(refresher);
+        refresher = setTimeout(function() {
+            for (let annotation of editor.getSession().getAnnotations())
+                if (annotation.type == "error") return set_color(undefined, true);
+            set_color(undefined, false);
+        }, 200);
+    });
+
+    return div;
 }
 
 function create_input(type, value, settings, onChange)
@@ -835,48 +572,50 @@ function create_input(type, value, settings, onChange)
 
         let multiselect = Array.isArray(value);
         let update_label = () => {
-            if (!multiselect) return button.innerText = settings.values[value];
+            if (!multiselect) return button.innerText = value;
             let label = "";
             for (let val of value)
-                label += (label != "" ? ", " : "") + settings.values[val];
+                label += (label != "" ? ", " : "") + val;
             button.innerText = label;
         }
         update_label();
 
+        let active_idx = !multiselect ? settings.values.indexOf(value) : null;
         let ul = document.createElement("ul");
         ul.className = "dropdown-menu";
         for (let i = 0; i < settings.values.length; i++)
         {
-            let disabled = settings.disabled_values && settings.disabled_values.includes(i);
+            let value_i = settings.values[i];
+            let disabled = settings.disabled_values && settings.disabled_values.includes(value_i);
             let li = document.createElement("li");
             li.className = "dropdown-item" + (disabled ? " disabled" : "");
             if (!multiselect)
             {
-                li.innerText = settings.values[i];
-                if (i == value) li.classList.add("active");
+                li.innerText = value_i;
+                if (i == active_idx) li.classList.add("active");
                 li.onclick = () => {
-                    ul.children[value].classList.remove('active');
-                    value = i;
-                    ul.children[value].classList.add('active');
+                    ul.children[active_idx].classList.remove('active');
+                    value = value_i;
+                    ul.children[i].classList.add('active');
                     update_label();
                     if (onChange) onChange(value);
                 }
             }
             else
             {
-                let [box, label] = create_input("checkbox", value.includes(i), {label: settings.values[i]});
+                let [box, label] = create_input("checkbox", value.includes(value_i), {label: value_i});
                 li.appendChild(box);
                 li.appendChild(label);
                 li.onclick = (e) => {
-                    if (value.includes(i))
+                    if (value.includes(value_i))
                     {
                         box.checked = false;
-                        value = value.filter(x => x != i);
+                        value = value.filter(x => x != value_i);
                     }
                     else
                     {
                         box.checked = true;
-                        value.push(i);
+                        value.push(value_i);
                         value.sort();
                     }
                     update_label();
@@ -971,7 +710,7 @@ function create_input(type, value, settings, onChange)
     else
     {
         let style = (type == 'checkbox') ? "margin-right: 5px;" :
-            `width: ${width}; padding-bottom: 0; padding-top: 0;`;
+            `width: ${width}; padding: 0 8px;`;
         if (settings.style != undefined)
             style += settings.style;
         input.style = style;
@@ -999,3 +738,13 @@ function create_input(type, value, settings, onChange)
 
     return [input, label];
 }
+
+function wrap(...elements)
+{
+    let div = document.createElement("div");
+    div.className = "single-line";
+    for (let elem of elements)
+        div.appendChild(elem);
+    return div;
+}
+

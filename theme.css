@@ -22,6 +22,7 @@
 
 /* Header */
 
+main { height: calc(100% - 3em); }
 body > header
 {
     height: 3em;
@@ -37,12 +38,12 @@ body > header
     box-shadow: 0 1px 6px 0 rgba(0,0,0,0.4);
 }
 
-.header-list { display: flex; position: absolute; }
-.header-list > i { padding-right: 10px; padding-left: 10px; line-height: 1; }
-#project-name { padding-right: 0px; }
 header i:hover { color: #fff; }
 header > #right { right: 15px; }
 header > #left { left: 15px; }
+.header-list { display: flex; position: absolute; }
+.header-list > i { padding-right: 10px; padding-left: 10px; line-height: 1; }
+#project-name { padding-right: 0px; }
 
 /* Separator */
 
@@ -54,25 +55,31 @@ hr
     border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.gutter
+.gutter { position: relative; }
+.gutter:hover { cursor: ew-resize; }
+.gutter:after
 {
     border: 0;
     border-right: 1px solid grey;
     opacity: .5;
+
+    content: '';
+    height: 100%;
+    position: absolute;
+    transform: translateX(5px);
 }
-.gutter:hover { cursor: ew-resize; }
 
 /* Lists */
 
 .pannel { padding: 10px }
-.pannel>ul { padding-right: 20px; padding-left: 10px; }
+.pannel>ul { padding-left: 0; }
 
 h3 { position: relative; }
 
 .header-button
 {
     position: absolute;
-    right: 20px;
+    right: 0px;
     width: 29px;
     height: 29px;
     padding-top: 0;
@@ -92,14 +99,18 @@ h3 { position: relative; }
 
 .nav-tabs { border-bottom: 0px; cursor: pointer; }
 
+#function_list > li { padding: 0; padding-bottom:8px;}
+
 /* Misc. */
 
-i { cursor: pointer; color: #ddd; }
-i:hover { color: #bbb; }
+i { cursor: pointer; color: #ccc; }
+i:hover { color: #aaa; }
 .single-line { display: flex; flex-direction: row; }
 .lut-canvas:hover { filter: brightness(70%); }
 #sliders form input { width: 20%; height: 1.5rem; }
 
+.dropdown-toggle { text-align: left; display: flex; justify-content: space-between; }
+.dropdown-toggle:after { margin-top: 8px; margin-left: 8px; }
 .dropdown-toggle:focus { pointer-events: none; }
 .dropdown-toggle:focus + .dropdown-menu {
     opacity: 1;
@@ -126,6 +137,12 @@ i:hover { color: #bbb; }
     color: #000;
     text-decoration: none;
     cursor: pointer;
+}
+
+.line-editor {
+    font-size: 20px;
+    outline: 1px solid #ced4da;
+    border-radius: 0.25rem;
 }
 
 /* Modal */
@@ -187,10 +204,3 @@ i:hover { color: #bbb; }
 #drawer[project-drawer="opened"] { left: 0px; }
 main[project-drawer="opened"] { transform: translate(300px, 0px); overflow-x: hidden; }
 main { transition: transform .5s; }
-
-
-#function_list > li { padding: 0; padding-bottom:8px;}
-/* Fitting settings */
-
-#profile span { padding: 2px; }
-#profile ul { padding-left: 0; }

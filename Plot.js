@@ -1,127 +1,213 @@
 class Plot
 {
-    constructor()
+    static tab_list = new TabList('#plot_list', Plot, true);
+
+    constructor(func, settings)
     {
-        this.name = "New Plot " + (Plot.tab_list.tabs.length + 1);
-        this.functions = ["model_f"];
-        this.axis_1 = 0;
+        if (func == undefined) func = []
+        if (!Array.isArray(func)) func = [func];
+        for (let i = 0; i < func.length; i++)
+        {
+            if (func[i] instanceof Function)
+                func[i] = func[i].name;
+        }
+
+        this.name = "Plot " + (Plot.tab_list.tabs.length + 1);
+        this.functions = func;
+
+        this.axis_1 = settings.axis_1;
+        this.axis_2 = settings.axis_2;
+        for (let name of Object.keys(settings.values))
+            Variable.get(name, settings.values[name]);
+
+        Plot.tab_list.add_element(this);
     }
 
     get_dimensions() { return this.dimensions || 0 };
-    get_axis_1() { return this.axis_1 || 0 };
-    get_axis_2() { return this.get_dimensions() == 0 ? undefined : (this.axis_2 || (this.get_axis_1() == 0 ? 1 : 0)) };
-    get_variables()
+    is_axis(name) { return (name == this.get_axis_1() || name == this.get_axis_2()); }
+    get_axis_1() { if (this.axis_1 == undefined) this.axis_1 = this.get_parameters()[0]; return this.axis_1; };
+    get_axis_2() {
+        if (this.get_dimensions() == 0) return undefined;
+        if (this.axis_2 == undefined) this.axis_2 = this.get_parameters()[1];
+        if (this.get_axis_1() == this.axis_2)
+        {
+            let params = this.get_parameters();
+            let axis_1 = params.indexOf(this.get_axis_1());
+            this.axis_2 = params[axis_1 == 0 ? 1 : 0];
+        }
+        return this.axis_2;
+    }
+
+    get_parameters()
     {
-        let variables = [];
+        let params = [];
         for (let func of this.functions)
-            variables = variables.concat($settings.functions[func].parameters);
-        return [...new Set([...variables])]; // Remove duplicates
+            params = params.concat(Expression.instances[func].parameters);
+        return [...new Set([...params])]; // Remove duplicates
     }
 
-    on_display(div)
+    on_display(parent)
     {
-        let plotDiv = document.createElement("div");
-        div.appendChild(plotDiv);
+        this.element = document.createElement("div");
+        parent.appendChild(this.element);
 
-        Plotly.newPlot(plotDiv, []);
+        let grid = document.createElement("div");
+        parent.appendChild(grid);
 
-        /*
-        div.innerHTML = `
-            <div class="single-line" style="justify-content: space-around; padding-bottom: 4px;">
-                <select class="form-select form-select-sm" id="shape-selector" style="width: 200px">
-                    <option value="2" selected>2D Graph</option>
-                    <option value="3">3D Surface</option>
-                </select>
-                <div style="display: flex">
-                    <label style="margin-right: 10px; font-size: 19px" for="resolution">Resolution</label>
-                    <input style="width: 200px" class="form-control form-control-sm" id="resolution" type="number" min="0" value="64"/>
-                </div>
-            </div>
-        `;
-
-        let shape_selector = document.querySelector("#shape-selector");
-        shape_selector.onchange = () => {
-            $settings.graph_dimensions = parseInt(shape_selector.value);
-            ensure_sliders();
-            refresh_all_plots();
-        }
-
-        let resolution_selector = document.querySelector("#resolution");
-        resolution_selector.onchange = () => {
-            $settings.resolution = resolution_selector.valueAsNumber;
-            refresh_all_plots();
-        }
-        */
-    }
-
-    slider_form(min, max, resolution)
-    {
-        let form = document.createElement("form");
-        form.className = "single-line";
-        form.style = "margin-bottom: 0; justify-content: space-between; gap: 8px";
-        form.innerHTML = `
-                    <label for="slider-min" style="padding: 4px 0px">Min</label>
-                    <input id="slider-min" type="number"
-                        class="form-control form-control-sm" value="${min}">
-
-                    <label for="slider-max" style="padding: 4px 0px">Max</label>
-                    <input id="slider-max" type="number"
-                        class="form-control form-control-sm" value="${max}">
-
-                    <label for="slider-res" style="padding: 4px 0px">Res</label>
-                    <input id="slider-res" type="number"
-                        class="form-control form-control-sm" value="${resolution}">
-                `;
-
-        /*
-        form[(e.path[0] == min_label)?0:1].focus();
-        form.onkeyup = (e) => {
-            if (e.key == "Enter") e.target.blur();
-        };
-        form.addEventListener('focusout', (e) => {
-            if (e.relatedTarget == null || e.relatedTarget.parentNode != form)
+        // Build sliders
+        grid.style = "display: flex; flex-wrap: wrap; gap: 4px 20px;";
+        for (let name of this.get_parameters())
+        {
+            let variable = Variable.get(name);
+            if (variable.is_number() && !this.is_axis(name))
             {
-                $settings.sliders[i].range[0] = form[0].valueAsNumber;
-                $settings.sliders[i].range[1] = form[1].valueAsNumber;
-                $settings.sliders[i].resolution = form[2].valueAsNumber;
-                form.replaceWith(sliderDiv);
-                build_slider();
+                let slider = variable.get_slider();
+                slider.style = "width: 280px";
+                grid.appendChild(slider);
             }
-        });
-        */
+        }
 
-        return form;
+        this.display_plot();
+    }
+
+    display_plot()
+    {
+        // Build traces
+        let traces = this.functions.map(name => this.gen_trace(name));
+
+        // Build layout
+        let layout = { width: this.element.parentNode.clientWidth - 30 };
+        let make_axis = (text, range) => ({ range: [range.min-0.1, range.max+0.1], title: {text} });
+        if (this.get_dimensions() == 0)
+        {
+            let axis_1 = this.get_axis_1();
+            layout.xaxis = make_axis(axis_1, Variable.get(axis_1));
+            layout.yaxis = { title: "y" };
+        }
+        else
+        {
+            let axis_1 = this.get_axis_1();
+            let axis_2 = this.get_axis_2();
+            layout.scene = {
+                xaxis: make_axis(axis_1, Variable.get(axis_1)),
+                yaxis: make_axis(axis_2, Variable.get(axis_2)),
+                zaxis: { title: "y" },
+            }
+        }
+
+        Plotly.react(this.element, traces, layout);
+    }
+
+    gen_trace_inputs(axis_1, axis_2)
+    {
+        let num_points = axis_1.resolution, dimensions = 1;
+
+        if (axis_2 != undefined)
+        {
+            num_points *= axis_2.resolution;
+            dimensions++;
+        }
+
+        let px = new Array(num_points);
+        for (let i = 0; i < num_points; i++)
+            px[i] = new Array(dimensions);
+
+        if (axis_2 == undefined)
+        {
+            let step = (axis_1.max - axis_1.min) / (axis_1.resolution - 1);
+            for (let j = 0; j < axis_1.resolution; j++)
+                px[j][0] = axis_1.min + step * j;
+        }
+        else
+        {
+            let step_1 = (axis_1.max - axis_1.min) / (axis_1.resolution - 1);
+            let step_2 = (axis_2.max - axis_2.min) / (axis_2.resolution - 1);
+            for (let j = 0; j < axis_2.resolution; j++)
+            {
+                for (let k = 0; k < axis_1.resolution; k++)
+                {
+                    let p = j * axis_1.resolution + k;
+                    px[p][0] = axis_1.min + step_1 * k;
+                    px[p][1] = axis_2.min + step_2 * j;
+                }
+            }
+        }
+
+        return px;
+    }
+
+    gen_trace(name)
+    {
+        let axis_1 = Variable.get(this.get_axis_1());
+        let axis_2 = Variable.get(this.get_axis_2());
+
+        let expr = Expression.instances[name];
+        let px = this.gen_trace_inputs(axis_1, axis_2);
+
+        let model = expr.compile(axis_1, axis_2);
+        let py = new Array(px.length);
+        for (let i = 0; i < px.length; i++)
+            py[i] = model(...px[i]);
+
+        let trace;
+        if (axis_2 == undefined)
+        {
+            trace = {
+                type: "line",
+                x: new Array(axis_1.resolution),
+                y: py,
+            };
+
+            for (let i = 0; i < axis_1.resolution; i++)
+                trace.x[i] = px[i][0];
+        }
+        else
+        {
+            trace = {
+                type: "surface",
+                x: new Array(axis_1.resolution),
+                y: new Array(axis_2.resolution),
+                z: new Array(axis_1.resolution),
+            };
+
+            for (let i = 0; i < axis_1.resolution; i++)
+            {
+                trace.x[i] = px[i][0];
+                trace.y[i] = px[i*axis_2.resolution][1];
+
+                trace.z[i] = new Array(axis_2.resolution);
+                for (let j = 0; j < axis_2.resolution; j++)
+                    trace.z[i][j] = py[i*axis_2.resolution + j];
+            }
+        }
+
+        trace.name = name;
+        return trace;
     }
 
     on_settings()
     {
-        let wrap = (...elements) => {
-            let div = document.createElement("div");
-            div.className = "single-line";
-            for (let elem of elements)
-                div.appendChild(elem);
-            return div;
-        }
-
         let content = document.createElement("div");
         content.style = "width: 600px";
 
         let build_settings = () => {
             content.innerHTML = "";
 
-            let func_settings = {
-                values: Object.keys($settings.functions),
-                label: "Functions",
-                id: "functions",
-                width: "200px",
-            };
-            let selection = this.functions.map(f => func_settings.values.indexOf(f));
-            let dropdown = create_input("dropdown", selection, func_settings, (new_selection) => {
-                this.functions = new_selection.map(i => func_settings.values[i]);
-                build_settings();
-            });
+            {
+                let func_settings = {
+                    values: Object.keys(Expression.instances),
+                    label: "Functions",
+                    id: "functions",
+                    width: "200px",
+                };
+                let dropdown = create_input("dropdown", this.functions, func_settings, (new_selection) => {
+                    this.functions = new_selection;
+                    build_settings();
+                });
 
-            content.appendChild(wrap(dropdown[1], dropdown[0]));
+                content.appendChild(wrap(dropdown[1], dropdown[0]));
+            }
+
             content.appendChild(document.createElement("br"));
 
             {
@@ -138,7 +224,7 @@ class Plot
 
                 let axis_settings = {
                     label: this.get_dimensions() == 1 ? "Axis Variables" : "Axis Variable",
-                    values: this.get_variables(),
+                    values: this.get_parameters(),
                     disabled_values: [this.get_axis_2()],
                     style: "min-width: 80px",
                     width: "unset",
@@ -169,24 +255,17 @@ class Plot
             content.appendChild(document.createElement("br"));
 
             {
-                let variables = this.get_variables();
+                let variables = this.get_parameters();
 
-                let drop_settings = {
-                    values: ["Fixed", "Range", "Trainable"]
-                };
-                let table = new Table("Variable", "Type", "Settings");
+                let table = new Table("Variable", "Value");
                 for (let i = 0; i < variables.length; i++)
                 {
-                    drop_settings.disabled = i == this.get_axis_1() || i == this.get_axis_2();
-                    let drop = create_input("dropdown", 0, drop_settings, (new_type) => {
-                        print(new_type);
-                    });
-                    let settings = "TODO";
-                    if (drop_settings.disabled)
-                    {
-                        settings = this.slider_form(0, 1, 16);
-                    }
-                    table.add_row(variables[i], drop, settings);
+                    let name = variables[i];
+                    let variable = Variable.get(name);
+                    if (this.is_axis(name))
+                        table.add_row(name, variable.get_slider_form());
+                    else
+                        table.add_row(name, variable.get_editor());
                 }
 
                 content.appendChild(table.element);
@@ -194,8 +273,12 @@ class Plot
         };
 
         build_settings();
-        Modal.open(this.name, content);
+        Modal.open(this.name, content, Plot.tab_list.repaint.bind(Plot.tab_list));
+    }
+
+    static repaint()
+    {
+        let active = Plot.tab_list.get_active_element();
+        active.display_plot();
     }
 }
-
-Plot.tab_list = new TabList('#plots', Plot, true);

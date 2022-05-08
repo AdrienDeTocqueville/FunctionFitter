@@ -173,8 +173,6 @@ function deserialize(data)
 
     // Unload current project
 
-    document.querySelector("#sliders").innerHTML = "";
-    document.querySelector("#variable_list").innerHTML = "";
     document.querySelector("#settings_list").innerHTML = "";
     document.querySelector("#function_list").innerHTML = "";
 
@@ -233,6 +231,4 @@ function deserialize(data)
             }
         }
     }
-
-    rebuild_ranges();
 }

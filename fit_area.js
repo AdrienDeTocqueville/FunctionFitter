@@ -107,11 +107,20 @@ add_setting("L", "range", 0.2, {min: 0, max: 1.5, step: 0.05});
 add_setting("O", "range", 0.0, {min: 0, max: 3, step: 0.05});
 add_setting("S", "range", 1, {min: 0, max: 3, step: 0.05});
 
-add_function(area_light);
-add_function(model_2d);
-add_function(model_f);
+new Expression(area_light);
+new Expression(model_2d);
+new Expression(model_f);
 
-Plot.tab_list.add_element(new Plot());
+new Fitting(area_light);
+
+new Plot([area_light, "model_1"], {
+    axis_1: 'z',
+    values: {
+        x: {min: 0, max: 4, res: 16},
+        z: {min: 0, max: 4, res: 32},
+        l: "0.6 * t", s: "0.4 * l", d: "-0.3 * s",
+    }
+});
 
 
 //$settings.parameters[0].range = [0, 5];

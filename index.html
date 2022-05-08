@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -42,110 +43,6 @@
 
     <main class="single-line">
 
-        <div class="pannel" id="controls">
-            <h3>Sliders</h3>
-            <div id="sliders" style="display: flex; flex-direction: column; padding-top: 8px"></div>
-
-            <hr/>
-            <h3> Variables
-                <i class="header-button fa-solid fa-pen-to-square" style="padding-top: 10px" id="edit_variables"></i>
-            </h3>
-            <ul id="variable_list"> </ul>
-        </div>
-
-        <div class="pannel" id="main" style="">
-
-            <div id="plots"></div>
-
-            <hr/>
-
-            <div id="fits"></div>
-
-            <div>
-                <ul class="nav nav-tabs" style="border-bottom: 0px">
-                    <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="#">model_f</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" tabindex="-1">+</a>
-                    </li>
-                </ul>
-
-
-                <div id="profile" style="border: 1px solid #ddd; padding: 15px;">
-                    <div class="single-line">
-                        <span>Reference&nbsp;&nbsp;</span>
-
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-secondary dropdown-toggle" type="button"> area_light </button>
-                            <ul class="dropdown-menu">
-                                <li class="dropdown-item">area_light</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <p>Parameters</p>
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th scope="col">Name</th>
-                                <th scope="col">Type</th>
-                                <th scope="col">Settings</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <th scope="row">x</th>
-                                <td>Constant</td>
-                                <td>0</td>
-                            </tr>
-                            <tr>
-                                <th scope="row">z</th>
-                                <td>Range</td>
-                                <td>[-1, 4]    |    64 subdivisions</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <p>Trainables</p>
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th scope="col">Name</th>
-                                <th scope="col">Type</th>
-                                <th scope="col">Settings</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <th scope="row">l</th>
-                                <td>Value</td>
-                                <td>value: 2</td>
-                            </tr>
-                            <tr>
-                                <th scope="row">s</th>
-                                <td>Polynom</td>
-                                <td>inputs: (x,z), order: 3</td>
-                            </tr>
-                            <tr>
-                                <th scope="row">d</th>
-                                <td>Constant</td>
-                                <td></td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <p>Expression</p>
-                    <p>model_f(0, z, 2, polynom(x, s_0, s_1, s_2), d)</p>
-
-                    <button class="btn btn-sm btn-primary" type="button">Fit 64 functions</button>
-
-                </div>
-            </div>
-
-
-        </div>
-
         <div class="pannel" id="settings">
             <h3>Settings
                 <button type="button" class="btn btn-outline-secondary header-button" id="add_var">+</button>
@@ -156,9 +53,100 @@
             <h3>Functions
                 <button type="button" class="btn btn-outline-secondary header-button" id="add_function">+</button>
             </h3>
-            <ul id="function_list"> </ul>
+            <ul id="function_list"></ul>
 
             <hr/>
+        </div>
+
+        <div class="pannel" id="plots">
+            <h3>Plots</h3>
+            <div id="plot_list"></div>
+        </div>
+
+        <div class="pannel" id="fitting">
+            <h3>Fitting</h3>
+            <div id="fitting_list">
+            </div>
+
+            <!--
+            <ul class="nav nav-tabs" style="border-bottom: 0px">
+                <li class="nav-item">
+                    <a class="nav-link active" aria-current="page" href="#">model_f</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" tabindex="-1">+</a>
+                </li>
+            </ul>
+
+
+            <div id="profile" style="border: 1px solid #ddd; padding: 15px;">
+                <div class="single-line">
+                    <span>Reference&nbsp;&nbsp;</span>
+
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button"> area_light </button>
+                        <ul class="dropdown-menu">
+                            <li class="dropdown-item">area_light</li>
+                        </ul>
+                    </div>
+                </div>
+                <br/>
+
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th scope="col">Parameter</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Settings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <th scope="row">x</th>
+                            <td>Constant</td>
+                            <td>0</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">z</th>
+                            <td>Range</td>
+                            <td>[-1, 4]    |    64 subdivisions</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th scope="col">Trainable</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Settings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <th scope="row">l</th>
+                            <td>Value</td>
+                            <td>value: 2</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">s</th>
+                            <td>Polynom</td>
+                            <td>inputs: (x,z), order: 3</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">d</th>
+                            <td>Constant</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p>Expression</p>
+                <p>model_f(0, z, 2, polynom(x, s_0, s_1, s_2), d)</p>
+
+                <button class="btn btn-sm btn-primary" type="button">Fit 64 functions</button>
+            </div>
+            -->
         </div>
 
     </main>
@@ -167,7 +155,11 @@
     <script src="math_lib.js"></script>
 
     <script src="layout_utils.js" defer></script>
+    <script src="Variable.js" defer></script>
     <script src="Plot.js" defer></script>
+    <script src="Expression.js" defer></script>
+    <script src="Fitting.js" defer></script>
+
     <script src="data_model.js" defer></script>
     <script src="fit_function.js" defer></script>
 

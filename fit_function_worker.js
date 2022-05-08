@@ -106,7 +106,7 @@ function levenberg_marquardt(model, dataset, params, options = {})
 
 
 (function () {
-    'use strict';
+    //'use strict';
 
     // some utilities for use in models
     function polynom(x)
@@ -271,6 +271,5 @@ function levenberg_marquardt(model, dataset, params, options = {})
 
             return fit_function(model.func, values, dataset, onstep);
         };
-
 
 }());
