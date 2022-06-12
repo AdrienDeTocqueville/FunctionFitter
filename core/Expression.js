@@ -27,9 +27,16 @@ class Expression
                 this.source = source;
                 this.parse_parameters();
 
+                // Handle Renaming
                 if (this.name != this.function.name && window[this.name] != undefined)
+                {
+                    delete Expression.instances[this.name];
                     delete window[this.name];
+                    for (let plot of Plot.tab_list.tabs)
+                        plot.functions = plot.functions.map(f => f == this.name ? this.function.name : f);
+                }
                 this.name = this.function.name;
+                Expression.instances[this.name] = this;
                 window[this.name] = this.function;
 
                 // this.repaint()
@@ -72,11 +79,25 @@ class Expression
 
     create_editor()
     {
-        let line_count = Math.min(15, this.source.split(/\r\n|\r|\n/).length - 1);
+        let lines = this.source.split(/\r\n|\r|\n/);
+        let line_count = Math.min(15, lines.length);
+        if (lines.length > 2 && lines[1].indexOf('{') != -1)
+        {
+            let skip = 0, idx = lines[1].indexOf('{');
+            for (let i = 0; i < idx; i++) skip += lines[1][i] == ' ' ? 1 : 4;
+            for (let i = 1; i < lines.length; i++)
+            {
+                let j = 0, rem = 0;
+                for (; rem < skip; j++)
+                    rem += (lines[i][j] == ' ') ? 1 : 4;
+                lines[i] = lines[i].substr(j);
+            }
+            this.source = lines.join("\n");
+        }
 
         let div = document.createElement("div");
         div.id = this.name + "-editor";
-        div.style = `margin-top: 5px; height: ${line_count*17 + 8}px`;
+        div.style = `height: ${line_count*16 + 8}px`;
         div.className = "editor";
         div.innerHTML = this.source;
         add_list_element('#function_list', "", [div]);
@@ -115,13 +136,9 @@ class Expression
     }
 }
 
-/*
-let default_func = `function new_function(x, y)
+let default_func = `function new_function()
 {
-    return x + y;
+    return 0;
 }`;
 
-document.querySelector("#add_function").onclick = () => {
-    add_reference(default_func, false);
-}
-*/
+document.querySelector("#add_function").onclick = () => { new Expression(default_func); }

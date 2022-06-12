@@ -108,7 +108,7 @@ h3 { position: relative; }
 
 .nav-tabs { border-bottom: 0px; cursor: pointer; }
 
-#function_list > li { padding: 0; padding-bottom:8px;}
+#function_list > li { padding: 0; margin-bottom:8px;}
 
 /* Misc. */
 
@@ -148,11 +148,16 @@ i:hover { color: #aaa; }
     cursor: pointer;
 }
 
+/* Editor */
+
 .line-editor {
     font-size: 20px;
     outline: 1px solid #ced4da;
     border-radius: 0.25rem;
 }
+
+body .ace_scrollbar { display: none; }
+body .ace_editor:hover .ace_scrollbar { display: block; }
 
 /* Modal */
 
