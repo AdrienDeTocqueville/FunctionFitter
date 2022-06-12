@@ -2,7 +2,7 @@ class Plot
 {
     static tab_list = new TabList('#plot_list', Plot, true);
 
-    constructor(settings, name)
+    constructor(settings = {}, name)
     {
         this.name = name || "Plot " + (Plot.tab_list.tabs.length + 1);
 
@@ -39,12 +39,18 @@ class Plot
     {
         let params = [];
         for (let func of this.functions)
+        {
+            if (!(func in Expression.instances))
+                console.error(func + " is not an Expression");
             params = params.concat(Expression.instances[func].parameters);
+        }
         return [...new Set(params)]; // Remove duplicates
     }
 
     on_display(parent)
     {
+        if (this.functions.length == 0) return;
+
         if (this.element === undefined)
             this.element = document.createElement("div");
         parent.appendChild(this.element);
@@ -140,7 +146,6 @@ class Plot
                     trace.z[j][i] = model(trace.x[i], trace.y[j]);
             }
         }
-        print(trace);
 
         trace.name = name;
         return trace;

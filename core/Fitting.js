@@ -2,11 +2,11 @@ class Fitting
 {
     static tab_list = new TabList('#fitting_list', Fitting);
 
-    constructor(settings, name)
+    constructor(settings = {}, name)
     {
         this.name = name || "model_" + (Fitting.tab_list.tabs.length + 1);
 
-        this.ref = settings.ref;
+        this.ref = settings.ref || Object.keys(Expression.instances)[0];
         if (this.ref instanceof Function) this.ref = this.ref.name;
 
         this.constant = new Set(settings.constant);
@@ -117,7 +117,7 @@ class Fitting
         let globals = {};
         for (let name in $settings)
         {
-            if (!window[name] instanceof Function)
+            if (!(window[name] instanceof Function))
                 globals[name] = window[name];
         }
         for (let name in Expression.instances)

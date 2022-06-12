@@ -41,7 +41,15 @@ class Expression
         else
         {
             let [number, dependencies] = Variable.eval_with_proxy(source);
-            if (dependencies == null) return false;
+            if (dependencies == null)
+            {
+                if (this.source == null)
+                {
+                    this.source = "0";
+                    this.parameters = [];
+                }
+                return false;
+            }
 
             this.source = source;
             this.parameters = dependencies;

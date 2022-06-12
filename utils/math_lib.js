@@ -2,6 +2,8 @@ function max(a, b)      { return Math.max(a, b); }
 function min(a, b)      { return Math.min(a, b); }
 function saturate(x)    { return Math.max(0, Math.min(x, 1)); }
 function clamp(x, a, b) { return Math.max(a, Math.min(x, b)); }
+function round(x)       { return Math.round(x); }
+function floor(x)       { return Math.floor(x); }
 function frac(x)        { return x - Math.trunc(x); }
 function lerp(x, y, t)  { return (1 - t) * x + t * y; }
 function rcp(x)         { return 1 / x; }

@@ -63,7 +63,7 @@ class TabList
         li.className = "nav-item nav-link active";
         li.innerText = "+";
         li.tabIndex = -1;
-        li.onclick = () => { new elem_type(); }
+        li.onclick = () => { let x = new elem_type(); if (has_settings) x.on_settings(); }
 
         this.active_tab = li;
 

@@ -101,14 +101,17 @@ class Variable
             return label;
         };
 
+        let value_norm = (this.value - this.min) / (this.max - this.min);
+        let value_round = Math.round(value_norm * this.resolution) / this.resolution;
+
         let slider = document.createElement("input");
         slider.className = "form-range";
         slider.type = "range";
         slider.id = this.name + "-slider";
         slider.step = (this.max-this.min) / (this.resolution - 1);
         slider.min = this.min;
-        slider.max = this.max
-        slider.value = this.value;
+        slider.max = this.max;
+        slider.value = value_round * (this.max-this.min) + this.min;
         slider.oninput = () => {
             this.value = slider.valueAsNumber;
             if (show_label) value_label.innerText = this.value;
@@ -132,12 +135,13 @@ class Variable
             form.addEventListener('focusout', (e) => {
                 if (e.relatedTarget?.parentNode == form) return;
                 this.value = clamp(this.value, this.min, this.max);
-                slider.step = (this.max-this.min) / this.resolution;
-                min_label.innerText = slider.min = this.min;
-                max_label.innerText = slider.max = this.max
-                slider.value = this.value;
-                if (show_label) value_label.innerText = this.value;
-                form.replaceWith(slider_div);
+                repaint_all();
+                //slider.step = (this.max-this.min) / this.resolution;
+                //min_label.innerText = slider.min = this.min;
+                //max_label.innerText = slider.max = this.max
+                //slider.value = this.value;
+                //if (show_label) value_label.innerText = this.value;
+                //form.replaceWith(slider_div);
             });
         };
 
@@ -149,7 +153,7 @@ class Variable
         font_style += "padding-left: 4px";
 
         let label = create_label(this.name + " =");
-        let value_label = create_label(this.value);
+        let value_label = create_label(slider.value);
         label.style = font_style;
         value_label.style = font_style;
 
@@ -179,9 +183,9 @@ class Variable
                 id="${this.name}-res" value="${this.resolution}">
         `;
 
-        form[0].onchange = (e) => { this.min = min(e.target.valueAsNumber, this.max); Plot.repaint(); }
-        form[1].onchange = (e) => { this.max = max(e.target.valueAsNumber, this.min); Plot.repaint(); }
-        form[2].onchange = (e) => { e.target.value = this.resolution = max(e.target.valueAsNumber, 2); Plot.repaint(); }
+        form[0].onchange = (e) => { this.min = min(e.target.valueAsNumber, this.max); }
+        form[1].onchange = (e) => { this.max = max(e.target.valueAsNumber, this.min); }
+        form[2].onchange = (e) => { e.target.value = this.resolution = max(e.target.valueAsNumber, 2); }
 
         return form;
     }
@@ -211,7 +215,10 @@ Variable.eval_with_proxy = (code) =>
             let split = error.message.indexOf(" ");
             let msg = error.message.substr(split);
             if (msg != " is not defined")
+            {
+                console.error(error.message);
                 return [null, null];
+            }
 
             // Create missing variable and retry
             let name = error.message.substr(0, split);
