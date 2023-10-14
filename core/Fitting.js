@@ -92,7 +92,7 @@ class Fitting
     {
         // Create worker thread
         this.worker = new Worker("core/fit_function_worker.js", {name: this.name});
-        this.worker.onerror = (e) => console.error(e);
+        this.worker.onerror = (e) => Console.error(e);
 
         // Find input axes
         let ref = Expression.instances[this.ref];
@@ -180,5 +180,29 @@ class Fitting
             y_values[i] = ref(...x_values[i]);
 
         return {x_values, y_values};
+    }
+
+    static export()
+    {
+        let fitting = Fitting.tab_list.tabs[Fitting.tab_list.active_tab.tabIndex];
+        let ref = Expression.instances[fitting.ref];
+
+        let axes = ref.parameters .filter(v => !fitting.constant.has(v)) .map(v => Variable.get(v));
+        let dependencies = Variable.get_dependencies(fitting.expression.parameters, axes);
+        axes = axes.map(v => (v instanceof Variable) ? v.name : v);
+
+        let result =`function ${fitting.name}(${axes.join(', ')})\n`;
+        result += '{\n';
+
+        if (dependencies.size != 0)
+        {
+            let sorted = Variable.sort_by_dependency(dependencies, axes);
+            result += sorted.map(v => `\tlet ${v.name} = ${v.value};\n`).join('');
+        }
+
+        result += `\treturn ${fitting.expression.source};\n`;
+        result += '}\n';
+        console.log(result);
+        return result;
     }
 }

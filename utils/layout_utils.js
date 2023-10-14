@@ -34,7 +34,7 @@ let Modal = {
                 <h5 style="margin-top: 20px; margin-bottom: 20px">${title}</h5>
             </div>`;
 
-        modal.onclick = (event) => { if (modal == event.path[0]) Modal.close(); }
+        modal.onclick = (event) => { if (event.target == modal) Modal.close(); }
         modal.querySelector(".close").onclick = Modal.close;
 
         document.body.appendChild(modal);

@@ -41,7 +41,7 @@ class Expression
 
                 // this.repaint()
             } catch (error) {
-                console.error(error);
+                Console.error(error);
                 return false;
             }
         }

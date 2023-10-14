@@ -41,7 +41,7 @@ class Plot
         for (let func of this.functions)
         {
             if (!(func in Expression.instances))
-                console.error(func + " is not an Expression");
+                Console.error(func + " is not an Expression");
             params = params.concat(Expression.instances[func].parameters);
         }
         return [...new Set(params)]; // Remove duplicates
@@ -127,8 +127,12 @@ class Plot
                 y: new Array(axes[0].resolution),
             };
 
-            for (let i = 0; i < axes[0].resolution; i++)
-                trace.y[i] = model(trace.x[i]);
+            try {
+                for (let i = 0; i < axes[0].resolution; i++)
+                    trace.y[i] = model(trace.x[i]);
+            } catch (error) {
+                Console.error(name + ': ' + error);
+            }
         }
         else
         {
@@ -139,11 +143,17 @@ class Plot
                 z: new Array(axes[1].resolution),
             };
 
-            for (let j = 0; j < axes[1].resolution; j++)
-            {
-                trace.z[j] = new Array(axes[0].resolution);
-                for (let i = 0; i < axes[0].resolution; i++)
-                    trace.z[j][i] = model(trace.x[i], trace.y[j]);
+            try {
+                for (let j = 0; j < axes[1].resolution; j++)
+                {
+                    trace.z[j] = new Array(axes[0].resolution);
+                    for (let i = 0; i < axes[0].resolution; i++)
+                        trace.z[j][i] = model(trace.x[i], trace.y[j]);
+                }
+            } catch (error) {
+                Console.error(name + ': ' + error);
+                for (let j = 0; j < axes[1].resolution; j++)
+                    trace.z[j] = new Array(axes[0].resolution);
             }
         }
 

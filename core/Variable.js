@@ -216,13 +216,19 @@ Variable.eval_with_proxy = (code) =>
             let msg = error.message.substr(split);
             if (msg != " is not defined")
             {
-                console.error(error.message);
+                Console.error(error.message);
+                return [null, null];
+            }
+
+            let name = error.message.substr(0, split);
+            if (Variable.instances[name] != undefined)
+            {
+                Console.error(`Variable ${name} should be passed as parameter.`);
                 return [null, null];
             }
 
             // Create missing variable and retry
-            let name = error.message.substr(0, split);
-                Variable.get(name);
+            Variable.get(name);
             references.clear();
             retry = true;
         }
