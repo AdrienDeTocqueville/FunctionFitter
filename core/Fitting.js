@@ -91,7 +91,13 @@ class Fitting
     fit()
     {
         // Create worker thread
-        this.worker = new Worker("core/fit_function_worker.js", {name: this.name});
+        try {
+            this.worker = new Worker("core/fit_function_worker.js", {name: this.name});
+        } catch (error) {
+            Console.error("Failed to construct worker. Use the <a href='https://adriendetocqueville.github.io/FunctionFitter/'>real website</a> or launch your browser with <i>--allow-file-access-from-files</i>.");
+            return;
+        }
+
         this.worker.onerror = (e) => Console.error(e);
 
         // Find input axes

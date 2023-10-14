@@ -15,7 +15,8 @@ class Console
             error: 'red',
         };
         let div = document.createElement("div");
-        div.innerHTML = `<i class="fa ${icons[type]}" style="color: ${colors[type]}; padding-right: 10px"></i> ${txt}`;
+        div.style = "display: flex; align-items: center";
+        div.innerHTML = `<i class="fa ${icons[type]}" style="color: ${colors[type]}; padding-right: 10px"></i> <div>${txt}</div>`;
 
         add_list_element('#console_list', "display: flex; flex-direction: row", [div], (li) => {
             li.remove();
