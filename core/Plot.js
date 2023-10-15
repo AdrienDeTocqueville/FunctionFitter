@@ -15,7 +15,9 @@ class Plot
 
         this.axis_1 = settings.axis_1;
         this.axis_2 = settings.axis_2;
-        this.dimensions = settings.dimensions || (this.axis_2 ? 1 : 0);
+        this.dimensions = settings.dimensions;
+        if (this.dimensions == undefined)
+            this.dimensions = this.axis_2 ? 1 : 0;
 
         Plot.tab_list.add_element(this);
     }

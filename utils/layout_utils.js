@@ -555,13 +555,14 @@ function create_input(type, value, settings, onChange)
 
     if (type == 'range')
     {
-        input.value = value;
         input.min = settings.min || 0;
         input.max = settings.max || 1;
+		input.step = (input.max - input.min) / 256;
+        input.value = value;
 
         let label = document.createElement("label");
         label.style = "width: 50px";
-        label.innerText = value;
+        label.innerText = truncate(value, 3);
         label.htmlFor = settings.id;
 
         let rangeInput = input;
