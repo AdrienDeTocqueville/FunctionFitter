@@ -63,7 +63,7 @@ class Fitting
                 values: Object.keys(Expression.instances),
                 disabled_values: [this.name],
                 label: "Reference",
-                id: "ref",
+                id: "ref-button",
             };
             let ref = create_input("dropdown", this.ref, ref_settings, (r) => {
                 this.ref = r;
@@ -80,7 +80,18 @@ class Fitting
                 repaint_all();
             }
 
-            let row = wrap(wrap(ref[1], ref[0]), fit_button);
+            let dropdown = document.createElement("button");
+            dropdown.className = "btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split";
+
+            let dropdown_item = (txt) => '<a class="dropdown-item" href="#">' + txt + '</a>';
+            let dropdown_menu = document.createElement("button");
+            dropdown_menu.className = "dropdown-menu";
+            dropdown_menu.innerHTML = ['Dropout', 'Export'].map(i => dropdown_item(i)).join('')
+
+            let button_group = wrap(fit_button, dropdown, dropdown_menu);
+            button_group.className = "btn-group";
+
+            let row = wrap(wrap(ref[1], ref[0]), button_group);
             row.style = "justify-content: space-around";
             parent.appendChild(row);
         }
@@ -121,7 +132,7 @@ class Fitting
 
         // Transfer global scope
         let globals = {};
-        for (let name in $settings)
+        for (let name in Setting.instances)
         {
             if (!(window[name] instanceof Function))
                 globals[name] = window[name];
@@ -137,7 +148,11 @@ class Fitting
         this.worker.onmessage = (event) => {
 
             if (event.data.type == "onfinish")
+            {
                 delete this.worker;
+
+                Console.log("Fitted with MSE = " + squared_error(model, dataset, event.data.payload));
+            }
 
             for (let i = axis_count; i < axes.length; i++)
             {
@@ -148,7 +163,6 @@ class Fitting
             }
 
             repaint_all();
-            // TODO: compute MSE
         };
 
         // Start async process

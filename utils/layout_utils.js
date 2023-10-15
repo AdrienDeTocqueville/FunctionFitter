@@ -9,7 +9,10 @@ function add_list_element(list, style, children, on_delete)
     li.style = style;
 
     for (let child of children)
-        li.appendChild(child);
+    {
+        if (child)
+            li.appendChild(child);
+    }
 
     if (on_delete != null)
     {
@@ -21,7 +24,10 @@ function add_list_element(list, style, children, on_delete)
         li.appendChild(delete_button);
     }
 
-    document.querySelector(list).appendChild(li);
+    if (typeof list === 'string' || list instanceof String)
+        list = document.querySelector(list);
+
+    list.appendChild(li);
 }
 
 let Modal = {
@@ -178,10 +184,10 @@ function load_lut_async(url, name, canvas)
 
             context.clearRect(0, 0, img.width, img.height);
             context.drawImage(img, 0, 0);
-            $settings[name].image = context.getImageData(0, 0, img.width, img.height);
+            Setting.instances[name].image = context.getImageData(0, 0, img.width, img.height);
 
             Plot.repaint();
-            resolve($settings[name]);
+            resolve(Setting.instances[name]);
         };
         img.onerror = reject;
         img.src = url;
@@ -223,7 +229,7 @@ function add_lut(name, url, bilinear = true)
 
 function sample_lut(name, x, y, channel)
 {
-    let lut = $settings[name], data = lut.image;
+    let lut = Setting.instances[name], data = lut.image;
     if (data == null) return 0;
 
     x = saturate(x) * (data.width - 1);
@@ -257,40 +263,6 @@ function sample_lut(name, x, y, channel)
     return lerp(low, high, y - y_low);
 }
 
-/// SETTINGS
-
-function add_setting(name, type, initial_value, settings = {})
-{
-    // allowed types:
-    //  - checkbox
-    //  - number
-    //  - text
-    //  - range
-
-    if (window[name] != undefined)
-        return;
-
-    settings.label = name;
-    settings.id = "settings-" + name;
-
-    let [input, label] = create_input(type, initial_value, settings, (value) => {
-        window[name] = value;
-        $settings[name].value = value;
-        Plot.repaint();
-    });
-
-    label.style = "margin-right: 30px";
-
-    window[name] = initial_value;
-    $settings[name] = { type, value: initial_value, settings: {...settings} };
-
-    add_list_element('#settings_list', "display: flex; flex-direction: row", [label, input], (li) => {
-        delete $settings[name];
-        delete window[name];
-        li.remove();
-    });
-}
-
 /// Project Drawer
 
 function refresh_project_list()
@@ -308,6 +280,19 @@ function refresh_project_list()
             delete_project(name);
         });
     }
+}
+
+function register_sample(name, callback)
+{
+    let div = document.createElement("div");
+    div.innerText = name;
+    div.onclick = () => {
+        deserialize(); // unload everything: TODO: add save warning
+        callback();
+        set_project_drawer(false);
+    };
+
+    add_list_element('#sample_list', "", [div]);
 }
 
 function set_project_drawer(open)
@@ -341,7 +326,7 @@ function repaint_all()
 function set_theme(theme)
 {
     let current = document.body.getAttribute('data-theme')
-    theme = theme || (current == 'dark' ? 'light' : 'dark');
+    theme = theme || (current == 'light' ? 'dark' : 'theme');
     localStorage.setItem('theme', theme);
     document.body.setAttribute('data-theme', theme);
 }
@@ -616,9 +601,9 @@ function create_input(type, value, settings, onChange)
         return input;
 
     let label = document.createElement("label");
-    label.htmlFor = settings.id;
     label.innerHTML = settings.label;
     label.style = "white-space: nowrap; padding: 2px; padding-right: 6px";
+    if (type != "dropdown") label.htmlFor = settings.id;
 
     return [input, label];
 }

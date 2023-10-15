@@ -115,15 +115,6 @@ importScripts("../utils/math_lib.js");
 function lstsq(model, initial_values, dataset, options)
 {
     // Error metric
-    function squared_error(model, dataset, params)
-    {
-        let x = dataset.x_values, y = dataset.y_values;
-        let error = 0, n = x.length;
-        for (let i = 0; i < n; i++)
-            error += Math.pow(model(...x[i], ...params) - y[i], 2);
-        return error;
-    }
-
     let x0 = initial_values;
     let x1 = initial_values.splice();
 

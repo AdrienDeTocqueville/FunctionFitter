@@ -21,7 +21,7 @@ class Console
         add_list_element('#console_list', "display: flex; flex-direction: row", [div], (li) => {
             li.remove();
             if (document.querySelector("#console_list").childElementCount == 0)
-                Console.pannel.style.display = "none";
+                Console.close();
         });
         
         Console.pannel.style.display = "block";
@@ -41,4 +41,11 @@ class Console
     {
         Console.print(txt, 'error');
     }
+
+    static close()
+    {
+        Console.pannel.style.display = "none";
+    }
 }
+
+document.querySelector("#close_console").onclick = () => Console.close();

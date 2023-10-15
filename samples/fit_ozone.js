@@ -22,11 +22,10 @@ function GetSample(s, count, tExit)
     return [lerp(t0, t1, 0.5), t1-t0];
 }
 
-if (!deserialize($projects["ozone"]))
-{
-    function ozone_optical_depth(cosTheta)
+register_sample("Ozone layer", () => {
+    function ozone_optical_depth(cosTheta, height)
     {
-        var r = RADIUS + HEIGHT;
+        var r = RADIUS + height * ALTITUDE;
         var cosHoriz = HorizonAngle(r);
         var tExit = IntersectSphere(RADIUS + ALTITUDE, cosTheta, r);
 
@@ -42,32 +41,24 @@ if (!deserialize($projects["ozone"]))
         }
         return (1/177) * optical_depth;
     }
-    function model_ozone_optical_depth(cosTheta, a0, b0, c0, a1, b1, c1)
-    {
-        // Rational function
-        return polynom(cosTheta, a0, b0, c0) / polynom(cosTheta, a1, b1, c1);
-    }
 
-    function main()
-    {
-        add_setting("SAMPLE_COUNT", "range", 64, {min: 1, max: 64});
-        add_setting("RADIUS", "number", 6378.1);
-        add_setting("ALTITUDE", "number", 40);
-        add_setting("HEIGHT", "range", 0, {min: 0, max: 49});
-        add_setting("OZONE_START", "number", 10);
-        add_setting("OZONE_WIDTH", "number", 30);
+    new Setting("SAMPLE_COUNT", "range", 64, {min: 1, max: 64});
+    new Setting("RADIUS", "number", 6378.1);
+    new Setting("ALTITUDE", "number", 40);
+    new Setting("OZONE_START", "number", 10);
+    new Setting("OZONE_WIDTH", "number", 30);
 
-        new Expression(ozone_optical_depth);
-        new Fitting({ref: ozone_optical_depth});
-        
-        Variable.get("cosTheta").resolution = 64;
+    Variable.get("cosTheta").resolution = 64;
+    Variable.get("a1").value = 1;
 
-        new Plot({
-            functions: [ozone_optical_depth]
-        });
+    new Expression(ozone_optical_depth);
+    new Fitting({
+        ref: ozone_optical_depth,
+        constant: ["height"],
+        value: "polynom(cosTheta, a0, b0, c0) / polynom(cosTheta, a1, b1, c1)",
+    }, "ozone_fit");
 
-        set_project_name("ozone");
-    }
-    main()
-}
-
+    new Plot({
+        functions: [ozone_optical_depth, "ozone_fit"]
+    });
+});

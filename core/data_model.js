@@ -1,4 +1,4 @@
-let $settings = {}, $projects;
+let $projects;
 var print = console.log;
 let loaded_project = null;
 
@@ -6,7 +6,7 @@ $projects = load_projects();
 refresh_project_list();
 
 set_theme(localStorage.getItem('theme'));
-deserialize();
+deserialize($projects[localStorage.getItem('last-project')]);
 
 // Modal
 function project_modal_content (callback)
@@ -14,7 +14,7 @@ function project_modal_content (callback)
     let content = document.createElement("div");
     content.className = "single-line";
     content.innerHTML = `
-        <input class="form-control" type="text">${loaded_project || ""}</input>
+        <input class="form-control" type="text" value="${loaded_project || ""}">
         <button class="btn btn-success" style="padding-left: 15px 0; margin-left: 10px;">Save</button>
     `;
 
@@ -64,6 +64,8 @@ document.querySelector("#switch-theme").onclick = () => set_theme();
 function set_project_name(name)
 {
     document.querySelector("#project-name").innerText = loaded_project = name;
+    localStorage.setItem('last-project', name);
+    print(name);
 }
 
 function load_projects()
@@ -110,9 +112,9 @@ function serialize()
         plots: {},
     };
 
-    for (let name in $settings)
+    for (let name in Setting.instances)
     {
-        let src = $settings[name];
+        let src = Setting.instances[name];
         if (src.type == 'lut')
         {
             serialized.settings[name] = {
@@ -125,6 +127,7 @@ function serialize()
         {
             let other = {...src};
             other.settings = {...src.settings};
+						delete other.name;
             delete other.settings.label;
             delete other.settings.id;
             if (Object.keys(settings).length !== 0)
@@ -183,15 +186,15 @@ function deserialize(data)
     document.querySelector("#settings_list").innerHTML = "";
     document.querySelector("#function_list").innerHTML = "";
 
-    if ($settings)
+    if (Setting.instances)
     {
-        for (let name in $settings)
+        for (let name in Setting.instances)
             delete window[name];
         for (let name in Expression.instances)
             delete window[name];
     }
 
-    $settings = {};
+    Setting.instances = {};
     Expression.instances = {};
     Variable.instances = {};
     Fitting.tab_list.clear();
@@ -209,7 +212,7 @@ function deserialize(data)
     {
         let src = data.settings[name];
         if (src.type == 'lut') add_lut(name, src.url, src.bilinear);
-        else add_setting(name, src.type, src.value, src.settings);
+        else new Setting(name, src.type, src.value, src.settings);
     }
 
     for (let src of data.expressions)
@@ -223,6 +226,9 @@ function deserialize(data)
 
     for (let name in data.plots)
         new Plot(data.plots[name], name);
+
+    // Mark project as last opened
+    localStorage.setItem('last-project', data.name);
 
     return true;
 }

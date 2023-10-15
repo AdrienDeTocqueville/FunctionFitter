@@ -127,10 +127,11 @@ class Variable
 
         let slider_div = wrap(min_label, slider, max_label);
         min_label.onclick = max_label.onclick = (e) => {
+            let origin = e.target == min_label ? 0 : 1;
             let form = this.get_slider_form();
             slider_div.replaceWith(form);
 
-            form[(e.path[0] == min_label)?0:1].focus();
+            form[origin].focus();
             form.onkeyup = (e) => { if (e.key == "Enter") e.target.blur(); };
             form.addEventListener('focusout', (e) => {
                 if (e.relatedTarget?.parentNode == form) return;
@@ -166,22 +167,7 @@ class Variable
 
     get_slider_form()
     {
-        let form = document.createElement("form");
-        form.className = "single-line";
-        form.style = "margin-bottom: 0; justify-content: space-between; gap: 8px";
-        form.innerHTML = `
-            <label for="${this.name}-min">Min</label>
-            <input type="number" style="padding: 0 8px" class="form-control"
-                id="${this.name}-min" value="${this.min}">
-
-            <label for="${this.name}-max">Max</label>
-            <input type="number" style="padding: 0 8px" class="form-control"
-                id="${this.name}-max" value="${this.max}">
-
-            <label for="${this.name}-res">Res</label>
-            <input type="number" style="padding: 0 8px" class="form-control"
-                id="${this.name}-res" value="${this.resolution}">
-        `;
+        let form = Setting.build_slider_form(this.name, this.min, this.max, this.resolution);
 
         form[0].onchange = (e) => { this.min = min(e.target.valueAsNumber, this.max); }
         form[1].onchange = (e) => { this.max = max(e.target.valueAsNumber, this.min); }

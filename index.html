@@ -36,10 +36,19 @@
         </div>
         <br/>
 
-        <h5>Local Projects</h5>
+        <h5>Saved Projects</h5>
         <br/>
 
         <ul id="project_list">
+        </ul>
+
+
+        <br/>
+        <br/>
+        <h5>Samples</h5>
+        <br/>
+
+        <ul id="sample_list">
         </ul>
     </nav>
 
@@ -47,13 +56,13 @@
 
         <div class="pannel" id="settings">
             <h3>Settings
-                <button type="button" class="btn btn-outline-secondary header-button" id="add_var">+</button>
+                <i class="fas fa-cog header-button" id="edit_settings"></i>
             </h3>
             <ul id="settings_list"> </ul>
 
             <hr/>
             <h3>Functions
-                <button type="button" class="btn btn-outline-secondary header-button" id="add_function">+</button>
+                <i class="fas fa-cog header-button" id="edit_functions"></i>
             </h3>
             <ul id="function_list"></ul>
 
@@ -72,7 +81,9 @@
 
             <div id="console" style="display: none">
                 <hr/>
-                <h3>Console</h3>
+                <h3>Console
+                    <button type="button" class="btn header-button" id="close_console" style="color: #ccc">×</button>
+                </h3>
                 <ul id="console_list" style="padding-left: 0">
                 </ul>
             </div>
@@ -84,14 +95,16 @@
     <script src="utils/math_lib.js"></script>
     <script src="utils/layout_utils.js" defer></script>
 
+    <script src="core/Setting.js" defer></script>
     <script src="core/Variable.js" defer></script>
     <script src="core/Plot.js" defer></script>
     <script src="core/Expression.js" defer></script>
     <script src="core/Fitting.js" defer></script>
     <script src="core/Console.js" defer></script>
-    <script src="core/data_model.js" defer></script>
 
     <script src="samples/fit_ozone.js" defer></script>
+
+    <script src="core/data_model.js" defer></script>
 </body>
 
 </html>

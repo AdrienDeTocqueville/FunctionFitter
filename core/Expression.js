@@ -141,4 +141,4 @@ let default_func = `function new_function()
     return 0;
 }`;
 
-document.querySelector("#add_function").onclick = () => { new Expression(default_func); }
+document.querySelector("#edit_functions").onclick = () => { new Expression(default_func); }
