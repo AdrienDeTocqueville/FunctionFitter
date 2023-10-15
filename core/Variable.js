@@ -60,6 +60,9 @@ class Variable
         this.max    = values?.max     || 1;
         this.resolution = values?.res || 32;
 
+        if (this.max < this.min)
+            this.max = this.min + 1;
+
         if (values?.__proto__ === Object.prototype)
             values = values.value;
         this.set_value(values || 0);
@@ -71,7 +74,7 @@ class Variable
         return typeof this.value === "number";
     }
 
-    set_value(value)
+    set_value(value, update_range = true)
     {
         let [number, dependencies] = Variable.eval_with_proxy(value);
         if (dependencies == null) return false;
@@ -83,8 +86,22 @@ class Variable
             if (dependency.dependencies.includes(this.name)) return false;
         }
 
+        this.value = value;
         this.dependencies = dependencies;
-        this.value = dependencies.length == 0 ? clamp(number, this.min, this.max) : value;
+
+        if (dependencies.length == 0)
+        {
+            if (update_range)
+            {
+                if (number > this.max) this.max = Math.ceil(value/10)*10;
+                if (number < this.min) this.min = Math.floor(value/10)*10;
+            }
+            else
+                number = clamp(number, this.min, this.max);
+
+            this.value = number;
+        }
+
         return true;
     }
 
@@ -101,9 +118,6 @@ class Variable
             return label;
         };
 
-        let value_norm = (this.value - this.min) / (this.max - this.min);
-        let value_round = Math.round(value_norm * this.resolution) / this.resolution;
-
         let slider = document.createElement("input");
         slider.className = "form-range";
         slider.type = "range";
@@ -111,7 +125,7 @@ class Variable
         slider.step = (this.max-this.min) / (this.resolution - 1);
         slider.min = this.min;
         slider.max = this.max;
-        slider.value = value_round * (this.max-this.min) + this.min;
+        slider.value = this.value;
         slider.oninput = () => {
             this.value = slider.valueAsNumber;
             if (show_label) value_label.innerText = this.value;
@@ -154,7 +168,7 @@ class Variable
         font_style += "padding-left: 4px";
 
         let label = create_label(this.name + " =");
-        let value_label = create_label(slider.value);
+        let value_label = create_label(this.value);
         label.style = font_style;
         value_label.style = font_style;
 

@@ -83,10 +83,20 @@ class Fitting
             let dropdown = document.createElement("button");
             dropdown.className = "btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split";
 
-            let dropdown_item = (txt) => '<a class="dropdown-item" href="#">' + txt + '</a>';
+            let dropdown_item = (txt, onclick) => {
+                let dropdown_item = document.createElement("a");
+                dropdown_item.className = "dropdown-item";
+                dropdown_item.innerText = txt;
+                dropdown_item.onclick = onclick;
+                return dropdown_item;
+            };
+
             let dropdown_menu = document.createElement("button");
             dropdown_menu.className = "dropdown-menu";
             dropdown_menu.innerHTML = ['Dropout', 'Export'].map(i => dropdown_item(i)).join('')
+
+            dropdown_menu.appendChild(dropdown_item('Dropout', () => {}));
+            dropdown_menu.appendChild(dropdown_item('Export', () => this.export()));
 
             let button_group = wrap(fit_button, dropdown, dropdown_menu);
             button_group.className = "btn-group";
@@ -155,12 +165,7 @@ class Fitting
             }
 
             for (let i = axis_count; i < axes.length; i++)
-            {
-                let new_value = event.data.payload[i - axis_count];
-                if (new_value > axes[i].max) axes[i].max = Math.ceil(new_value/10)*10;
-                if (new_value < axes[i].min) axes[i].min = Math.floor(new_value/10)*10;
-                axes[i].set_value(new_value);
-            }
+                axes[i].set_value(event.data.payload[i - axis_count]);
 
             repaint_all();
         };
@@ -202,16 +207,16 @@ class Fitting
         return {x_values, y_values};
     }
 
-    static export()
+    export()
     {
-        let fitting = Fitting.tab_list.tabs[Fitting.tab_list.active_tab.tabIndex];
-        let ref = Expression.instances[fitting.ref];
+        let ref = Expression.instances[this.ref];
 
-        let axes = ref.parameters .filter(v => !fitting.constant.has(v)) .map(v => Variable.get(v));
-        let dependencies = Variable.get_dependencies(fitting.expression.parameters, axes);
+        let export_name = "export_" + this.name;
+        let axes = ref.parameters .filter(v => !this.constant.has(v)) .map(v => Variable.get(v));
+        let dependencies = Variable.get_dependencies(this.expression.parameters, axes);
         axes = axes.map(v => (v instanceof Variable) ? v.name : v);
 
-        let result =`function ${fitting.name}(${axes.join(', ')})\n`;
+        let result =`function ${export_name}(${axes.join(', ')})\n`;
         result += '{\n';
 
         if (dependencies.size != 0)
@@ -220,9 +225,15 @@ class Fitting
             result += sorted.map(v => `\tlet ${v.name} = ${v.value};\n`).join('');
         }
 
-        result += `\treturn ${fitting.expression.source};\n`;
+        result += `\treturn ${this.expression.source};\n`;
         result += '}\n';
-        console.log(result);
-        return result;
+
+        let expr = Expression.instances[export_name];
+        if (expr == undefined)
+            return new Expression(result);
+
+        expr.set_source(result);
+        expr.repaint();
+        return expr;
     }
 }

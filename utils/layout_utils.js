@@ -428,7 +428,7 @@ function create_input(type, value, settings, onChange)
     }
 
 
-    let input;
+    let input, valid_html_for = false;
     if (type == "dropdown")
     {
         input = document.createElement("div");
@@ -540,6 +540,7 @@ function create_input(type, value, settings, onChange)
             text: "form-control",
         };
 
+        valid_html_for = true;
         input = document.createElement("input");
         input.className = classes[type];
         input.type = type;
@@ -603,7 +604,7 @@ function create_input(type, value, settings, onChange)
     let label = document.createElement("label");
     label.innerHTML = settings.label;
     label.style = "white-space: nowrap; padding: 2px; padding-right: 6px";
-    if (type != "dropdown") label.htmlFor = settings.id;
+    if (valid_html_for) label.htmlFor = settings.id;
 
     return [input, label];
 }

@@ -38,8 +38,6 @@ class Expression
                 this.name = this.function.name;
                 Expression.instances[this.name] = this;
                 window[this.name] = this.function;
-
-                // this.repaint()
             } catch (error) {
                 Console.error(error);
                 return false;
@@ -116,6 +114,15 @@ class Expression
                 self.set_source(editor.getValue());
             }, 500);
         });
+    }
+
+    repaint()
+    {
+        let editor = document.querySelector('#' + this.name + '-editor');
+        if (editor == undefined) return;
+
+        editor = ace.edit(editor).session.setValue(this.source);
+
     }
 
     compile(axes)

@@ -46,6 +46,12 @@ class Console
     {
         Console.pannel.style.display = "none";
     }
+
+    static clear()
+    {
+        document.querySelector('#console_list').innerHTML = "";
+        Console.close();
+    }
 }
 
-document.querySelector("#close_console").onclick = () => Console.close();
+document.querySelector("#close_console").onclick = () => Console.clear();
