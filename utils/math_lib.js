@@ -1,3 +1,4 @@
+
 function element_wise(action, vector_args, scalar_args)
 {
 	if (scalar_args == undefined) scalar_args = [];
@@ -70,12 +71,11 @@ function float4(x, y, z, w) { return new Proxy([x || 0, y || 0, z || 0, w || 0],
 function random(min = 0, max = 1) { return Math.random() * (max - min) + min; }
 function truncate(x, precision=2) { return Number(x.toFixed(precision)); }
 
-//TODO: reverse
 function polynom(x)
 {
-    let res = arguments[1];
+    let res = arguments[arguments.length-1];
     let x_p = x;
-    for (let i = 2; i < arguments.length; i++)
+    for (let i = arguments.length - 2; i >= 1; i--)
     {
         res += x_p * arguments[i];
         x_p *= x;
@@ -90,4 +90,33 @@ function squared_error(model, dataset, params)
 		for (let i = 0; i < n; i++)
 				error += Math.pow(model(...x[i], ...params) - y[i], 2);
 		return error;
+}
+
+// array2d is indexed by y then by x, cause when you print in the console it's this order
+// doesn't support wrapping
+function bilinear_sample(array2d, uv)
+{
+	let size_y = array2d.length;
+	let size_x = array2d[0].length;
+	
+    x = saturate(uv[0]) * (size_x - 1);
+    y = saturate(uv[1]) * (size_y - 1);
+
+    let x_low = floor(x);
+    let y_low = floor(y);
+    let x_lerp = (x - x_low);
+
+    let low = array2d[min(y_low, size_y-1)][min(x_low, size_x-1)];
+    if (x_low+1 < size_x)
+        low = lerp(low, array2d[min(y_low, size_y-1)][x_low+1], x_lerp);
+
+    let high = low;
+    if (y_low+1 < size_y)
+    {
+        high = array2d[y_low+1][min(x_low, size_x-1)];
+		if (x_low+1 < size_x)
+			high = lerp(high, array2d[y_low+1][x_low+1], x_lerp);
+    }
+
+    return lerp(low, high, y - y_low);
 }
