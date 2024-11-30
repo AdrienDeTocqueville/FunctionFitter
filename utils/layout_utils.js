@@ -295,6 +295,17 @@ function register_sample(name, callback)
     add_list_element('#sample_list', "", [div]);
 }
 
+function open_sample(name)
+{
+	for (let sample of document.querySelector("#sample_list").children)
+	{
+		if (sample.children[0].innerText == name)
+		{
+			sample.children[0].onclick();
+		}
+	}
+}
+
 function set_project_drawer(open)
 {
     current = this.drawer_opened || false;

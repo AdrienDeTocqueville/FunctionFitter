@@ -27,6 +27,7 @@ function min(a, b)      { return element_wise(Math.min, [a, b]); }
 function round(x)       { return element_wise(Math.round, [x]); }
 function floor(x)       { return element_wise(Math.floor, [x]); }
 function sqrt(x)        { return element_wise(Math.sqrt, [x]); }
+function pow(a, b)      { return element_wise(Math.pow, [a, b]); }
 function ln(x)          { return element_wise(Math.log, [x]); }
 function log2(x)        { return element_wise(Math.log2, [x]); }
 function log10(x)       { return element_wise(Math.log10, [x]); }

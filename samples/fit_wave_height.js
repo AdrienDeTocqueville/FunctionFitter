@@ -42,6 +42,15 @@ let table = (() => {
 	return result;
 })();
 
+	
+let g = 9.81;
+function PeakOmega(fetch, windSpeed) { return 22.0 * pow(abs(windSpeed * fetch*1000 / (g * g)), -0.33) };
+function Alpha(fetch, windSpeed) { return 0.076 * pow(windSpeed * windSpeed / (g * fetch*1000), 0.22) };
+
+function WindSpeed(peakOmega, alpha) { return min(32.7, pow(pow(alpha / 0.076, 4.54545) * pow(peakOmega / 22.0, -3.0) * g*g*g, 0.333)) };
+function Fetch(peakOmega, alpha) { return min(250.0, WindSpeed(peakOmega, alpha) * WindSpeed(peakOmega, alpha) / (1000 * g * pow(alpha / 0.076, 4.54545))) };
+
+
 register_sample("Wave height", () => {
 
     function water_height_table(fetch, windSpeed)
@@ -73,9 +82,9 @@ register_sample("Wave height", () => {
 		return lerp(low, high, w[2]);
     }
 	
+	
     Variable.get("fetch", {min: 0.5, max: 250, res: 32});
     Variable.get("windSpeed", {min: 0, max: 32.7, res: 32});
-	
     new Expression(water_height_table);
 	
     new Fitting({
@@ -89,4 +98,22 @@ register_sample("Wave height", () => {
 		
         functions: [water_height_table, "water_height_fit"]
     });
+	
+	
+	// Plot in terms of peak omega and alpha
+    function water_height_table_2(peakOmega, alpha)
+    {
+		return water_height_table(Fetch(peakOmega, alpha), WindSpeed(peakOmega, alpha));
+    }
+	
+    Variable.get("peakOmega", {min: PeakOmega(250, 32.7), max: PeakOmega(0.5, 0.001), res: 128});
+    Variable.get("alpha", {min: Alpha(250, 0.001), max: Alpha(0.5, 32.7), res: 128});
+    new Expression(water_height_table_2);
+	
+    /*new Plot({
+		axis_1: "peakOmega",
+		axis_2: "alpha",
+		
+        functions: [water_height_table_2]
+    });*/
 });
