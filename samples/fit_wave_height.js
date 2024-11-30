@@ -80,7 +80,7 @@ register_sample("Wave height", () => {
 	
     new Fitting({
         ref: water_height_table,
-        value: "polynom(windSpeed, polynom(fetch, a1, b1),  polynom(fetch, a2, b2), 0)",
+        value: "polynom(fetch, -polynom(windSpeed,a,b,0)/(250*250), 2.0*polynom(windSpeed,a,b,0)/250, 0)",
     }, "water_height_fit");
 	
     new Plot({
