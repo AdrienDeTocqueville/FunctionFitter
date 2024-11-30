@@ -16,7 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js" integrity="sha512-6ts6Fu561/yzWvD6uwQp3XVYwiWNpWnZ0hdeQrETqtnQiGjTfOS06W76aUDnq51hl1SxXtJaqy7IsZ3oP/uZEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 
-<body>
+<body onload="open_sample('Wave height');">
     <header>
         <div id="left" class="header-list">
             <i class="fa-solid fa-bars"></i>
@@ -52,7 +52,7 @@
         </ul>
     </nav>
 
-    <main class="single-line">
+    <main class="single-line" id="regular-view">
 
         <div class="pannel" id="settings">
             <h3>Settings
@@ -90,6 +90,13 @@
         </div>
 
     </main>
+	
+    <main class="single-line" id="sheet-view" style="display: none !important">
+		<button type="button" class="btn header-button" style="color: #ccc; z-index: 100;">×</button>
+		<div id="sheet-editor"></div>
+	</main>
+
+	<div id="sheet_list" class="tab-bar"></div>
 
     <script src="utils/split.js"></script>
     <script src="utils/math_lib.js"></script>
@@ -101,9 +108,11 @@
     <script src="core/Expression.js" defer></script>
     <script src="core/Fitting.js" defer></script>
     <script src="core/Console.js" defer></script>
+    <script src="core/Sheet.js" defer></script>
 
     <script src="samples/fit_ozone.js" defer></script>
     <script src="samples/test_moments.js" defer></script>
+    <script src="samples/fit_wave_height.js" defer></script>
 
     <script src="core/data_model.js" defer></script>
 </body>

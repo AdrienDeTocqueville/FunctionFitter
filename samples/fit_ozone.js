@@ -1,3 +1,6 @@
+register_sample("Ozone layer", () => {
+	new Sheet({
+        source: `
 function OzoneDensity(h)
 {
     return max(1 - abs(2*h/OZONE_WIDTH - 2*OZONE_START/OZONE_WIDTH - 1), 0);
@@ -21,8 +24,11 @@ function GetSample(s, count, tExit)
     t1 = t1*t1*tExit;
     return [lerp(t0, t1, 0.5), t1-t0];
 }
+`
+	}, "ozone");
 
-register_sample("Ozone layer", () => {
+	Sheet.close_editor();
+
     function ozone_optical_depth(cosTheta, height)
     {
         var r = RADIUS + height * ALTITUDE;

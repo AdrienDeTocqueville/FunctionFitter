@@ -65,7 +65,7 @@ class Variable
 
         if (values?.__proto__ === Object.prototype)
             values = values.value;
-        this.set_value(values || 0);
+        this.set_value(values || this.min);
         Variable.instances[name] = this;
     }
 

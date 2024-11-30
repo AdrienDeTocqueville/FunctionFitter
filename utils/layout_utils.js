@@ -54,10 +54,10 @@ let Modal = {
 
 class TabList
 {
-    // Requirements on elem_type
-    // functions: on_display, on_settings
-    // properties: name
-    constructor(id, elem_type, has_settings = false)
+    // Requirements on elem_type:
+    // required: func on_display, prop name
+    // optional: func on_settings
+    constructor(id, elem_type, has_settings = false, has_content = true)
     {
         this.tabs = [];
         this.element = document.querySelector(id);
@@ -71,14 +71,17 @@ class TabList
         li.tabIndex = -1;
         li.onclick = () => { let x = new elem_type(); if (has_settings) x.on_settings(); }
 
-        this.active_tab = li;
-
-        this.content = document.createElement("div");
-        this.content.style = "border: 1px solid #ddd; padding: 15px;"
-
         this.ul.appendChild(li);
         this.element.appendChild(this.ul);
-        this.element.appendChild(this.content);
+
+        if (has_content)
+        {
+            this.active_tab = li;
+
+            this.content = document.createElement("div");
+            this.content.style = "border: 1px solid #ddd; padding: 15px;"
+            this.element.appendChild(this.content);
+        }
 
         if (has_settings)
         {
@@ -97,8 +100,9 @@ class TabList
         }
     }
 
-    get_active_element() { return this.tabs[this.active_tab.tabIndex]; }
-    repaint() { this.content.innerHTML = ""; this.get_active_element().on_display(this.content); }
+    get_active_element() { return this.active_tab ? this.tabs[this.active_tab.tabIndex] : null; }
+    repaint() { if (this.content) this.content.innerHTML = ""; this.get_active_element()?.on_display(this.content); }
+    unselect() { this.active_tab?.classList.remove("active"); this.active_tab = null; }
 
     add_element(elem)
     {
@@ -107,7 +111,7 @@ class TabList
         li.innerText = elem.name;
         li.tabIndex = this.tabs.length;
         li.onclick = () => {
-            this.active_tab.classList.remove("active");
+            this.active_tab?.classList.remove("active");
             this.active_tab = li;
             this.active_tab.classList.add("active");
             this.repaint();
@@ -126,7 +130,8 @@ class TabList
         this.active_tab.classList.add("active");
 
         this.tabs = [];
-        this.content.innerHTML = "";
+        if (this.content)
+            this.content.innerHTML = "";
     }
 }
 
@@ -293,6 +298,17 @@ function register_sample(name, callback)
     };
 
     add_list_element('#sample_list', "", [div]);
+}
+
+function open_sample(name)
+{
+    for (let sample of document.querySelector("#sample_list").children)
+    {
+        if (sample.children[0].innerText == name)
+        {
+            sample.children[0].onclick();
+        }
+    }
 }
 
 function set_project_drawer(open)
@@ -557,7 +573,7 @@ function create_input(type, value, settings, onChange)
     {
         input.min = settings.min || 0;
         input.max = settings.max || 1;
-		input.step = (input.max - input.min) / 256;
+        input.step = (input.max - input.min) / 256;
         input.value = value;
 
         let label = document.createElement("label");

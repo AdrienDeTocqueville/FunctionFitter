@@ -95,15 +95,18 @@ class Expression
 
         let div = document.createElement("div");
         div.id = this.name + "-editor";
-        div.style = `height: ${line_count*16 + 8}px`;
-        div.className = "editor";
+		div.className = 'function-editor';
         div.innerHTML = this.source;
-        add_list_element('#function_list', "", [div]);
 
-        let editor = ace.edit(div);
-        editor.setTheme("ace/theme/monokai");
-        editor.session.setMode("ace/mode/javascript");
-        editor.renderer.setScrollMargin(4, 0);
+        let handle = document.createElement("div");
+		handle.className = 'resize-handle';
+
+        let container = wrap(handle, div);
+		container.className = 'editor-container';
+        container.style = `height: ${line_count*16.3 + 8}px`;
+        add_list_element('#function_list', "", [container]);
+
+		let editor = this.create_resizable_editor(div, handle)
 
         let refresher, self = this;
         editor.session.on('change', function(delta) {
@@ -115,6 +118,41 @@ class Expression
             }, 500);
         });
     }
+	
+	create_resizable_editor(div, handle)
+	{
+        let editor = ace.edit(div);
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/javascript");
+        editor.renderer.setScrollMargin(4, 0);
+
+		let isResizing = false;
+		let startY;
+		let startHeight;
+
+		handle.addEventListener('mousedown', (e) => {
+			isResizing = true;
+			startY = e.clientY;
+			startHeight = div.parentNode.offsetHeight;
+			document.body.style.cursor = 'ns-resize';
+		});
+
+		document.addEventListener('mousemove', (e) => {
+			if (!isResizing) return;
+
+			const diff = e.clientY - startY;
+			let newHeight = startHeight + diff;
+			newHeight = max(newHeight, 74); // approx 3 lines
+			div.parentNode.style.height = newHeight + 'px';
+		});
+
+		document.addEventListener('mouseup', () => {
+			isResizing = false;
+			document.body.style.cursor = '';
+		});
+
+		return editor;
+	}
 
     repaint()
     {

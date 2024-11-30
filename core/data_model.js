@@ -110,6 +110,7 @@ function serialize()
         variables: [],
         models: {},
         plots: {},
+        sheets: {},
     };
 
     for (let name in Setting.instances)
@@ -177,6 +178,13 @@ function serialize()
         };
     }
 
+    for (let sheet of Sheet.tab_list.tabs)
+    {
+        serialized.plots[sheet.name] = {
+			// TODO
+        };
+    }
+
     return serialized;
 }
 
@@ -199,6 +207,7 @@ function deserialize(data)
     Variable.instances = {};
     Fitting.tab_list.clear();
     Plot.tab_list.clear();
+    Sheet.tab_list.clear();
 
     // Update name
     loaded_project = data?.name;
@@ -226,6 +235,9 @@ function deserialize(data)
 
     for (let name in data.plots)
         new Plot(data.plots[name], name);
+
+    for (let name in data.sheets)
+        new Sheet(data.sheets[name], name);
 
     // Mark project as last opened
     localStorage.setItem('last-project', data.name);

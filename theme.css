@@ -22,7 +22,7 @@
 
 /* Header */
 
-main { height: calc(100% - 3em); }
+main { height: calc(100vh - 3em); }
 body > header
 {
     height: 3em;
@@ -159,6 +159,27 @@ i:hover { color: #aaa; }
 body .ace_scrollbar { display: none; }
 body .ace_editor:hover .ace_scrollbar { display: block; }
 
+.editor-container {
+  position: relative;
+  height: 400px; /* initial height */
+  width: 100%;
+  border: 1px solid #ccc;
+}
+
+.function-editor {
+  height: calc(100% - 10px);
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 10px;
+  background-color: #ccc;
+  cursor: ns-resize;
+}
+
 /* Modal */
 
 #modal
@@ -218,3 +239,15 @@ body .ace_editor:hover .ace_scrollbar { display: block; }
 #drawer[project-drawer="opened"] { left: 0px; }
 main[project-drawer="opened"] { transform: translate(300px, 0px); overflow-x: hidden; }
 main { transition: transform .5s; }
+
+
+/* Footer */
+
+.tab-bar
+{
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	z-index: 1000;
+	width: auto;
+}
