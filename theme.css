@@ -22,7 +22,7 @@
 
 /* Header */
 
-main { height: calc(100% - 3em); }
+main { height: calc(100vh - 3em); }
 body > header
 {
     height: 3em;
@@ -218,3 +218,15 @@ body .ace_editor:hover .ace_scrollbar { display: block; }
 #drawer[project-drawer="opened"] { left: 0px; }
 main[project-drawer="opened"] { transform: translate(300px, 0px); overflow-x: hidden; }
 main { transition: transform .5s; }
+
+
+/* Footer */
+
+.tab-bar
+{
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	z-index: 1000;
+	width: auto;
+}
