@@ -50,8 +50,6 @@ x	1
 `
 	}, "water_height");
 
-	Sheet.close_editor();
-
     function water_height_table(fetch, windSpeed)
     {
 		let f = find_lerp(fetch, table.axis_f);

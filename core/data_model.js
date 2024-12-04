@@ -65,7 +65,6 @@ function set_project_name(name)
 {
     document.querySelector("#project-name").innerText = loaded_project = name;
     localStorage.setItem('last-project', name);
-    print(name);
 }
 
 function load_projects()
@@ -137,6 +136,13 @@ function serialize()
         }
     }
 
+    for (let sheet of Sheet.tab_list.tabs)
+    {
+        serialized.sheets[sheet.name] = {
+			source: sheet.source
+        };
+    }
+
     for (let name in Expression.instances)
     {
         let expr = Expression.instances[name];
@@ -175,13 +181,6 @@ function serialize()
             axis_2: plot.axis_2,
             dimensions: plot.dimensions,
             functions: plot.functions,
-        };
-    }
-
-    for (let sheet of Sheet.tab_list.tabs)
-    {
-        serialized.plots[sheet.name] = {
-			// TODO
         };
     }
 
@@ -224,6 +223,9 @@ function deserialize(data)
         else new Setting(name, src.type, src.value, src.settings);
     }
 
+    for (let name in data.sheets)
+        new Sheet(data.sheets[name], name);
+
     for (let src of data.expressions)
         new Expression(src);
 
@@ -235,9 +237,6 @@ function deserialize(data)
 
     for (let name in data.plots)
         new Plot(data.plots[name], name);
-
-    for (let name in data.sheets)
-        new Sheet(data.sheets[name], name);
 
     // Mark project as last opened
     localStorage.setItem('last-project', data.name);

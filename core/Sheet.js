@@ -2,7 +2,6 @@ class Sheet
 {
     static tab_list = new TabList('#sheet_list', Sheet, false, false);
 
-    static code_view = false;
     static code_editor = null;
     static current_tab = null;
 
@@ -12,22 +11,21 @@ class Sheet
         this.source = (settings.source || "").trim();
 
         Sheet.tab_list.add_element(this);
+		this.rebuild();
     }
 
     on_display()
     {
-		if (Sheet.code_view == true)
+		if (Sheet.current_tab)
 		{
 			if (Sheet.current_tab == this)
 				return Sheet.close_editor();
 
-			// Editor was open, save changes
-			this.rebuild();
+			// Save changes before changing tab
+			Sheet.current_tab.rebuild(Sheet.code_editor.getValue());
 		}
-
-        if (Sheet.code_view == false)
-        {
-            Sheet.code_view = true;
+		else
+		{
             document.querySelector("#regular-view").style.display = "none";
             document.querySelector("#sheet-view").style.display = "flex";
         }
@@ -64,9 +62,10 @@ class Sheet
         Sheet.code_editor.session.setValue(this.source);
     }
 
-    rebuild()
+    rebuild(new_source)
     {
-		this.source = Sheet.code_editor.getValue();
+		if (new_source)
+			this.source = new_source;
 
         // recompile functions
 		globalThis.eval(this.source); // whatcha gonna do
@@ -74,14 +73,13 @@ class Sheet
 
     static close_editor()
     {
-        if (Sheet.code_view == true)
+        if (Sheet.current_tab)
         {
-			Sheet.current_tab.rebuild();
+			Sheet.current_tab.rebuild(Sheet.code_editor.getValue());
 			Sheet.current_tab = null;
 
             document.querySelector("#regular-view").style.display = "flex";
             document.querySelector("#sheet-view").style.display = "none";
-            Sheet.code_view = false;
             Sheet.tab_list.unselect();
             repaint_all();
         }

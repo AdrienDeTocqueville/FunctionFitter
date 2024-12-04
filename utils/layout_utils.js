@@ -69,7 +69,7 @@ class TabList
         li.className = "nav-item nav-link active";
         li.innerText = "+";
         li.tabIndex = -1;
-        li.onclick = () => { let x = new elem_type(); if (has_settings) x.on_settings(); }
+        li.onclick = () => { let x = new elem_type(); if (!this.content) this.ul.children[this.ul.childElementCount-2].onclick(); if (has_settings) x.on_settings(); }
 
         this.ul.appendChild(li);
         this.element.appendChild(this.ul);
@@ -120,7 +120,8 @@ class TabList
         this.ul.insertBefore(li, this.ul.children[this.ul.childElementCount-1]);
 
         this.tabs.push(elem);
-        li.onclick();
+		if (this.content)
+			li.onclick();
     }
 
     clear()
@@ -342,7 +343,7 @@ function repaint_all()
 function set_theme(theme)
 {
     let current = document.body.getAttribute('data-theme')
-    theme = theme || (current == 'light' ? 'dark' : 'theme');
+    theme = theme || (current == 'light' ? 'dark' : 'light');
     localStorage.setItem('theme', theme);
     document.body.setAttribute('data-theme', theme);
 }

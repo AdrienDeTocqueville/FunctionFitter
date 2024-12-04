@@ -27,8 +27,6 @@ function GetSample(s, count, tExit)
 `
 	}, "ozone");
 
-	Sheet.close_editor();
-
     function ozone_optical_depth(cosTheta, height)
     {
         var r = RADIUS + height * ALTITUDE;
