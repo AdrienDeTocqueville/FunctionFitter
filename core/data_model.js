@@ -8,6 +8,20 @@ refresh_project_list();
 set_theme(localStorage.getItem('theme'));
 deserialize($projects[localStorage.getItem('last-project')]);
 
+window.addEventListener("beforeunload", (e) => {
+	if (loaded_project != null)
+	{
+		let proj = serialize();
+		if (proj != $projects[loaded_project])
+		{
+			e.preventDefault();
+			e.returnValue = "";
+			return;
+		}
+	}
+	delete e["returnValue"];
+});
+
 // Modal
 function project_modal_content (callback)
 {

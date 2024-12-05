@@ -179,11 +179,68 @@ class Expression
             `${definitions} return ${this.name}(${this.parameters.join(',')})`
         return new Function(axes, body);
     }
+	
+    static edit()
+    {
+        let content = document.createElement("ul");
+        content.style = "width: 600px";
+
+        let build_settings = () => {
+            content.innerHTML = "";
+
+            for (let name in Expression.instances)
+            {
+                let func = Expression.instances[name];
+				if (!func.is_function)
+					continue;
+
+				var label = document.createElement("p");
+				label.innerText = name;
+
+                add_list_element(content, "display: flex; flex-direction: row", [label], (li) => {
+                    delete Expression.instances[name];
+                    delete window[name];
+                    li.remove();
+                });
+            }
+
+            content.appendChild(document.createElement("hr"));
+
+            let new_name = create_input("text", "", { callback: (new_text) => {
+				let name = new_text.trim();
+				create_btn.disabled = name == "" || window[name] != undefined;
+			} });
+            let create_btn = document.createElement("button");
+            create_btn.className = "btn btn-primary";
+            create_btn.style = "margin-left: 8px";
+            create_btn.innerText = "Add";
+			create_btn.disabled = true;
+            create_btn.onclick = () => {
+                let name = new_name.value.trim();
+                if (name == "" || window[name] != undefined)
+                {
+                    Console.error("Name '" + name + "' is invalid.");
+                    return;
+                }
+                new Expression(`function ${name}()\n{\n\treturn 0;\n}`);
+                build_settings();
+            };
+
+            content.appendChild(wrap(new_name, create_btn));
+        };
+
+        build_settings();
+        Modal.open("Functions", content, () => {
+            document.querySelector("#function_list").innerHTML = "";
+
+            for (let name in Expression.instances)
+            {
+                let func = Expression.instances[name];
+				if (func.is_function)
+					func.create_editor();
+            }
+        });
+    }
 }
 
-let default_func = `function new_function()
-{
-    return 0;
-}`;
-
-document.querySelector("#edit_functions").onclick = () => { new Expression(default_func); }
+document.querySelector("#edit_functions").onclick = Expression.edit;

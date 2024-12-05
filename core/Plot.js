@@ -248,6 +248,19 @@ class Plot
 
                 content.appendChild(table.element);
             }
+
+			{
+				let delete_btn = document.createElement("button");
+				delete_btn.className = "btn btn-danger center-text";
+				delete_btn.style = "width: 100%; height: 31px;";
+				delete_btn.innerText = "Delete";
+				delete_btn.onclick = () => {
+					Plot.tab_list.remove(this);
+					Modal.close();
+				};
+
+				content.appendChild(delete_btn);
+			}
         };
 
         build_settings();

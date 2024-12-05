@@ -68,7 +68,7 @@ class TabList
         let li = document.createElement("li");
         li.className = "nav-item nav-link active";
         li.innerText = "+";
-        li.tabIndex = -1;
+        li.$element = null;
         li.onclick = () => { let x = new elem_type(); if (!this.content) this.ul.children[this.ul.childElementCount-2].onclick(); if (has_settings) x.on_settings(); }
 
         this.ul.appendChild(li);
@@ -88,9 +88,8 @@ class TabList
             let settings = document.createElement("i");
             settings.className = "fa-solid fa-ellipsis-vertical";
             settings.onclick = () => {
-                if (this.active_tab.tabIndex == -1) return;
-                let elem = this.tabs[this.active_tab.tabIndex];
-                elem.on_settings();
+                if (this.active_tab.$element == null) return;
+                this.active_tab.$element.on_settings();
             }
 
             settings.style = "position: absolute; top: 12px; right: -5px; width: 20px; text-align: center";
@@ -100,16 +99,16 @@ class TabList
         }
     }
 
-    get_active_element() { return this.active_tab ? this.tabs[this.active_tab.tabIndex] : null; }
+    get_active_element() { return this.active_tab ? this.active_tab.$element : null; }
     repaint() { if (this.content) this.content.innerHTML = ""; this.get_active_element()?.on_display(this.content); }
     unselect() { this.active_tab?.classList.remove("active"); this.active_tab = null; }
 
     add_element(elem)
     {
         let li = document.createElement("li");
+		li.$element = elem;
         li.className = "nav-item nav-link"
         li.innerText = elem.name;
-        li.tabIndex = this.tabs.length;
         li.onclick = () => {
             this.active_tab?.classList.remove("active");
             this.active_tab = li;
@@ -123,6 +122,47 @@ class TabList
 		if (this.content)
 			li.onclick();
     }
+
+	remove(elem)
+	{
+		let li = undefined;
+		for (let i of this.ul.childNodes)
+		{
+			if (elem == i.$element)
+			{
+				li = i;
+				break;
+			}
+		}
+
+		let idx = undefined;
+		for (let i = 0; i < this.tabs.length; i++)
+		{
+			if (elem == this.tabs[i])
+			{
+				idx = i;
+				break;
+			}
+		}
+		
+		if (li != undefined && idx != undefined)
+		{
+			if (this.active_tab == li)
+			{
+				this.active_tab = li.previousSibling || li.nextSibling;
+				if (this.active_tab)
+				{
+					if (this.active_tab.$element == null)
+						this.active_tab = null;
+					else
+						this.active_tab.classList.add("active");
+				}
+			}
+			this.tabs.splice(idx, 1);
+			li.remove();
+			this.repaint();
+		}
+	}
 
     clear()
     {
@@ -419,6 +459,7 @@ function create_editor(content, on_change)
     return div;
 }
 
+// type: [lut, dropdown, checkbox, number, range, text, button]
 function create_input(type, value, settings, onChange)
 {
     if (type == "lut")
@@ -516,6 +557,14 @@ function create_input(type, value, settings, onChange)
         input.appendChild(button);
         input.appendChild(ul);
     }
+	else if (type == "button")
+	{
+		input = document.createElement("button");
+		input.className = "btn btn-secondary";
+		input.style = "margin-left: 8px";
+		input.innerText = settings.innerText;
+		input.onclick = onChange;
+	}
     else if (Array.isArray(settings.values))
     {
         if (settings.dropdown == true)
@@ -574,7 +623,8 @@ function create_input(type, value, settings, onChange)
     {
         input.min = settings.min || 0;
         input.max = settings.max || 1;
-        input.step = (input.max - input.min) / 256;
+		if (settings.step == undefined)
+			input.step = (input.max - input.min) / 256;
         input.value = value;
 
         let label = document.createElement("label");
@@ -612,7 +662,13 @@ function create_input(type, value, settings, onChange)
             };
             input[props[type]] = value;
             if (onChange)
-                input.onchange = () => onChange(input[props[type]]);
+				input.onchange = () => onChange(input[props[type]]);
+			if (type == "text" && settings.callback)
+			{
+				input.onkeypress = () => setTimeout(function() {
+					settings.callback(input[props[type]])
+				}, 500);
+			}
         }
     }
 

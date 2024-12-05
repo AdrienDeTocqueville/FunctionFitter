@@ -1,6 +1,8 @@
 class Setting
 {
     static instances = {};
+	
+	static default_button = 'Console.log("Hello")';
 
     constructor(name, type, initial_value, settings = {}, refresh_ui = true)
     {
@@ -10,6 +12,7 @@ class Setting
         this.name = name;
         this.type = type;
         this.settings = {...settings};
+		this.settings.integer = false;
         this.set_value(initial_value);
 
         Setting.instances[name] = this;
@@ -25,6 +28,8 @@ class Setting
 
             min: this.settings.min,
             max: this.settings.max,
+			step: this.settings.integer ? 1.0 : undefined,
+			innerText: this.settings.label,
         };
 
         let [input, label] = create_input(this.type, this.value, settings, (value) => {
@@ -39,7 +44,15 @@ class Setting
     set_value(value)
     {
         if (this.type == "range")
+		{
             value = clamp(value, this.settings.min, this.settings.max);
+			if (this.settings.integer)
+				value = round(value);
+		}
+        if (this.type == "button" && !this.settings.label)
+		{
+			this.settings.label = Setting.default_button;
+		}
 
         window[this.name] = value;
         this.value = value;
@@ -47,7 +60,7 @@ class Setting
 
     set_type(type)
     {
-        let allowed = ["checkbox", "number", "text", "range", "lut"];
+        let allowed = ["number", "range", "checkbox", "button", "text", "lut"];
         if (!allowed.includes(type))
         {
             Console.error("Unknown settings type: " + type);
@@ -78,7 +91,7 @@ class Setting
                 let type_settings = {
                     label: name,
 
-                    values: ["number", "range", "checkbox", "LUT (todo)"],
+                    values: ["number", "range", "checkbox", "button", "LUT (todo)"],
                     width: '150px',
                 };
                 var [type, label] = create_input('dropdown', src.type, type_settings, (new_type) => {
@@ -89,11 +102,18 @@ class Setting
                 let settings;
                 if (src.type == "range")
                 {
-                    let form = Setting.build_slider_form(name, src.settings.min, src.settings.max);
+                    let form = Setting.build_slider_form(name, src.settings.min, src.settings.max, undefined, src.settings.integer);
                     form[0].onchange = (e) => { src.settings.min = min(e.target.valueAsNumber, src.settings.max); }
                     form[1].onchange = (e) => { src.settings.max = max(e.target.valueAsNumber, src.settings.min); }
+                    form[2].onchange = (e) => { src.settings.integer = e.target.checked; }
 
                     settings = wrap(form);
+                }
+                else if (src.type == "button")
+                {
+                    settings = create_input("text", Setting.default_button, {}, (txt) => {
+						src.settings.label = txt;
+					});
                 }
 
                 add_list_element(content, "display: flex; flex-direction: row", [label, type, settings], (li) => {
@@ -105,16 +125,20 @@ class Setting
 
             content.appendChild(document.createElement("hr"));
 
-            let new_name = create_input("text", "", {});
+            let new_name = create_input("text", "", { callback: (new_text) => {
+				let name = new_text.trim().toUpperCase();
+				create_btn.disabled = name == "" || window[name] != undefined;
+			} });
             let create_btn = document.createElement("button");
             create_btn.className = "btn btn-primary";
             create_btn.style = "margin-left: 8px";
             create_btn.innerText = "Add";
+			create_btn.disabled = true;
             create_btn.onclick = () => {
-                let name = new_name.value.toUpperCase();
-                if (window[name] != undefined)
+                let name = new_name.value.trim().toUpperCase();
+                if (name == "" || window[name] != undefined)
                 {
-                    Console.error("Name '" + name + "' is already in use.");
+                    Console.error("Name '" + name + "' is invalid.");
                     return;
                 }
                 new Setting(name, "number", 0, {}, false);
@@ -139,7 +163,7 @@ class Setting
         });
     }
 
-    static build_slider_form(name, min, max, resolution)
+    static build_slider_form(name, min, max, resolution, integer)
     {
         let minmax = `
             <label for="${name}-min">Min</label>
@@ -156,14 +180,20 @@ class Setting
             <input type="number" style="padding: 0 8px" class="form-control"
                 id="${name}-res" value="${resolution}">
         `;
+		
+		let integ = integer == undefined ? '' : `
+            <label for="${name}-int">Integer</label>
+            <input type="checkbox" style="padding: 0 8px" class="form-check-input"
+                id="${name}-int" value="${integer}">
+        `;
 
         let form = document.createElement("form");
         form.className = "single-line";
         form.style = "margin-bottom: 0; justify-content: space-between; gap: 8px";
-        form.innerHTML = minmax + res;
+        form.innerHTML = minmax + res + integ;
 
         return form;
     }
 }
 
-document.querySelector("#edit_settings").onclick = () => Setting.edit()
+document.querySelector("#edit_settings").onclick = Setting.edit
