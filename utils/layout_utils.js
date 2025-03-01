@@ -119,7 +119,8 @@ class TabList
 
         this.ul.insertBefore(li, this.ul.children[this.ul.childElementCount-1]);
 
-		this.settings.style.display = "block";
+		if (this.settings)
+			this.settings.style.display = "block";
 
         this.tabs.push(elem);
 		if (this.content)
@@ -166,7 +167,7 @@ class TabList
 			this.repaint();
 		}
 
-		if (this.tabs.length == 0)
+		if (this.settings && this.tabs.length == 0)
 			this.settings.style.display = "none";
 	}
 

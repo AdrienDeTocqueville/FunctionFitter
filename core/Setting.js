@@ -179,7 +179,7 @@ class Setting
 			if (typeof this.value === 'object')
 			{
 				let headers = Object.keys(this.value);
-				let data = new Table(["variable", "values"], {value: {colSpan: 100}});
+				let data = new Table(["variable", "values"], {values: {colSpan: 100}});
 
 				for (let elem in this.value)
 				{
@@ -192,6 +192,47 @@ class Setting
 
 					data.add_row(row);
 				}
+
+				let editing = false;
+				data.element.onclick = (e) => {
+					let parent = e.target.parentNode;
+					if (parent.parentNode.nodeName == "THEAD") return;
+
+					if (editing) return;
+					editing = true;
+
+					let i = e.target.cellIndex;
+					let var_name = parent.children[0].innerText;
+
+					let editor = create_input(i == 0 ? "text" : "number", e.target.innerText, {});
+					editor.style = "width: 100px";
+					e.target.replaceWith(editor);
+
+					editor.focus();
+					editor.onkeyup = (e) => { if (e.key == "Enter") e.target.blur(); };
+					editor.addEventListener('focusout', (e) => {
+						if (i > 0)
+						{
+							this.value[var_name][i - 1] = editor.valueAsNumber;
+							let cell = document.createElement("td");
+							cell.innerText = editor.valueAsNumber.toString();
+							editor.replaceWith(cell);
+						}
+						else
+						{
+							if (editor.value == "" || this.value[editor.value] != undefined) return;
+
+							this.value[editor.value] = this.value[var_name];
+							delete this.value[var_name];
+							let cell = document.createElement("th");
+							cell.innerText = editor.value;
+							editor.replaceWith(cell);
+						}
+						editing = false;
+					});
+				};
+
+
 				content.appendChild(data.element);
 			}
         };

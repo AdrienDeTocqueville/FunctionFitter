@@ -51,7 +51,7 @@ class Fitting
             let variables = Variable.get_dependencies(this.expression.parameters, inputs);
             if (variables.size != 0)
             {
-                let var_table = new Table({}, "Variable", "Value");
+                let var_table = new Table(["Variable", "Value"]);
                 for (let variable of variables)
                     var_table.add_row([variable.name, variable.get_editor()]);
                 parent.appendChild(var_table.element);
