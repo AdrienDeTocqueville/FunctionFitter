@@ -22,7 +22,7 @@ class Fitting
 
             let inputs = Expression.instances[this.ref].parameters;
             {
-                let input_table = new Table("Input", "Settings");
+                let input_table = new Table(["Input", "Settings"]);
                 for (let i = 0; i < inputs.length; i++)
                 {
                     let constant = this.constant.has(inputs[i]);
@@ -35,7 +35,7 @@ class Fitting
                     });
                     let settings = !constant ? Variable.get(inputs[i]).get_slider_form()
                         : Variable.get(inputs[i]).get_slider(false);
-                    input_table.add_row(wrap(checkbox[0], checkbox[1]), settings);
+                    input_table.add_row([wrap(checkbox[0], checkbox[1]), settings]);
                 }
                 parent.appendChild(input_table.element);
             }
@@ -51,9 +51,9 @@ class Fitting
             let variables = Variable.get_dependencies(this.expression.parameters, inputs);
             if (variables.size != 0)
             {
-                let var_table = new Table("Variable", "Value");
+                let var_table = new Table({}, "Variable", "Value");
                 for (let variable of variables)
-                    var_table.add_row(variable.name, variable.get_editor());
+                    var_table.add_row([variable.name, variable.get_editor()]);
                 parent.appendChild(var_table.element);
             }
 

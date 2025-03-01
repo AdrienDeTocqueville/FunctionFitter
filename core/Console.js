@@ -23,7 +23,7 @@ class Console
             if (document.querySelector("#console_list").childElementCount == 0)
                 Console.close();
         });
-        
+
         Console.pannel.style.display = "block";
     }
 

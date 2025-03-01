@@ -151,6 +151,11 @@ i:hover { color: #aaa; }
     cursor: pointer;
 }
 
+.table {
+	display: block;
+	overflow-x: auto;
+}
+
 /* Editor */
 
 .line-editor {

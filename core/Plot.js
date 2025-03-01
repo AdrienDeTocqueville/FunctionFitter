@@ -13,8 +13,11 @@ class Plot
                 this.functions[i] = this.functions[i].name;
         }
 
+        this.scatter = settings.scatter || [];
+
         this.axis_1 = settings.axis_1;
         this.axis_2 = settings.axis_2;
+        this.scatter_axis = settings.scatter_axis;
         this.dimensions = settings.dimensions;
         if (this.dimensions == undefined)
             this.dimensions = this.axis_2 ? 1 : 0;
@@ -36,6 +39,7 @@ class Plot
         }
         return this.axis_2;
     }
+	get_scatter_axis() { return this.scatter_axis; }
 
     get_parameters()
     {
@@ -46,12 +50,21 @@ class Plot
                 Console.error(func + " is not an Expression");
             params = params.concat(Expression.instances[func].parameters);
         }
+		for (let scat of this.scatter)
+		{
+			if (scat in Setting.instances)
+			{
+				for (let key of Object.keys(Setting.instances[scat].value))
+					params.push(key);
+			}
+		}
+
         return [...new Set(params)]; // Remove duplicates
     }
 
     on_display(parent)
     {
-        if (this.functions.length == 0) return;
+        if (this.functions.length == 0 && this.scatter.length == 0) return;
 
         if (this.element === undefined)
             this.element = document.createElement("div");
@@ -80,6 +93,11 @@ class Plot
     {
         // Build traces
         let traces = this.functions.map(name => this.gen_trace(name));
+        let scatter = this.scatter.map(name => this.gen_scatter(name));
+
+		let scatter_axis = this.get_scatter_axis();
+		if (scatter.length == 0 || scatter_axis == undefined)
+			scatter_axis = "";
 
         // Build layout
         let layout = { width: this.element.parentNode.clientWidth - 30, uirevision: true };
@@ -88,7 +106,7 @@ class Plot
         {
             let axis_1 = this.get_axis_1();
             layout.xaxis = make_axis(axis_1, Variable.get(axis_1));
-            layout.yaxis = { title: "" };
+            layout.yaxis = { title: scatter_axis };
         }
         else
         {
@@ -97,11 +115,11 @@ class Plot
             layout.scene = {
                 xaxis: make_axis(axis_1, Variable.get(axis_1)),
                 yaxis: make_axis(axis_2, Variable.get(axis_2)),
-                zaxis: { title: "" },
+                zaxis: { title: scatter_axis },
             }
         }
 
-        Plotly.react(this.element, traces, layout);
+        Plotly.react(this.element, traces.concat(scatter), layout);
     }
 
     gen_trace(name)
@@ -163,6 +181,63 @@ class Plot
         return trace;
     }
 
+	gen_scatter(name) {
+
+		let data = Setting.instances[name].value;
+
+		let out_data = data[this.get_scatter_axis()];
+		if (out_data == undefined)
+		{
+			var axis = new Set(Object.keys(data));
+			axis.delete(this.get_axis_1());
+			if (this.get_dimensions() == 1)
+				axis.delete(this.get_axis_2());
+
+			out_data = data[axis[0]];
+			if (out_data == undefined)
+			{
+				let data_size = data[this.get_axis_1()].length;
+				out_data = new Array(data_size).fill(0);
+			}
+		}
+
+
+        let trace;
+        if (this.get_dimensions() == 0)
+		{
+			trace = {
+				x: data[this.get_axis_1()], y: out_data,
+				mode: 'markers',
+				marker: {
+					size: 5,
+					line: {
+						width: 0.5
+					},
+					opacity: 0.8
+				},
+				type: 'scatter'
+			};
+		}
+		else
+		{
+			trace = {
+				x: data[this.get_axis_1()], y: data[this.get_axis_2()], z: out_data,
+				mode: 'markers',
+				marker: {
+					size: 5,
+					line: {
+						width: 0.5
+					},
+					opacity: 0.8
+				},
+				type: 'scatter3d'
+			};
+		}
+
+			
+		return trace;
+	}
+
     on_settings()
     {
         let content = document.createElement("div");
@@ -170,6 +245,10 @@ class Plot
 
         let build_settings = () => {
             content.innerHTML = "";
+			
+			// Sanitize settings
+			if (!this.get_parameters().includes(this.get_axis_1()))
+				this.axis_1 = undefined;
 
             {
                 let func_settings = {
@@ -183,7 +262,62 @@ class Plot
                     build_settings();
                 });
 
+				dropdown[1].style.width = "90px";
                 content.appendChild(wrap(dropdown[1], dropdown[0]));
+            }
+
+            {
+				// Figure out possible values
+				let scatter_values = Object.keys(Expression.instances);
+				for (let setting in Setting.instances)
+				{
+					if (Setting.instances[setting].type == 'table')
+						scatter_values.push(setting);
+				}
+
+				let axis_values = new Set();
+				for (let setting in Setting.instances)
+				{
+					for (let key of Object.keys(Setting.instances[setting].value))
+						axis_values.add(key);
+				}
+				axis_values = Array.from(axis_values);
+				axis_values.splice(0, 0, undefined);
+
+				// Input choice dropdown
+                let scatter_settings = {
+                    values: scatter_values,
+                    label: "Scatter",
+                    id: "scatter",
+                    width: "200px",
+                };
+                let dropdown = create_input("dropdown", this.scatter, scatter_settings, (new_selection) => {
+                    this.scatter = new_selection;
+                    build_settings();
+                });
+
+				// Output choice dropdown
+                let axis_settings = {
+                    label: "Scatter Axis",
+					values: axis_values,
+                    //disabled_values: [this.get_axis_2()],
+                    style: "min-width: 80px",
+                    width: "unset",
+                };
+                let axis = create_input("dropdown", this.get_scatter_axis(), axis_settings, (new_axis) => {
+                    this.scatter_axis = new_axis;
+                    build_settings();
+                });
+                let axis_drop = wrap(axis[1], axis[0]);
+
+				// UI formatting
+				dropdown[1].style.width = "90px";
+				let scatter_drop = wrap(dropdown[1], dropdown[0]);
+				scatter_drop.style = "margin-top: 10px";
+
+                let elem = wrap(scatter_drop, axis_drop);
+                content.appendChild(elem);
+                elem.style = "justify-content: space-between";
             }
 
             content.appendChild(document.createElement("br"));
@@ -220,7 +354,7 @@ class Plot
                     axis_settings.style += "; margin-left: 4px";
                     let axis_z = create_input("dropdown", this.get_axis_2(), axis_settings, (new_axis) => {
                         this.axis_2 = new_axis;
-                    build_settings();
+						build_settings();
                     });
                     axis.appendChild(axis_z);
                 }
@@ -235,15 +369,15 @@ class Plot
             {
                 let variables = this.get_parameters();
 
-                let table = new Table("Variable", "Value");
+                let table = new Table(["Variable", "Value"]);
                 for (let i = 0; i < variables.length; i++)
                 {
                     let name = variables[i];
                     let variable = Variable.get(name);
                     if (this.is_axis(name))
-                        table.add_row(name, variable.get_slider_form());
+                        table.add_row([name, variable.get_slider_form()]);
                     else
-                        table.add_row(name, variable.get_editor());
+                        table.add_row([name, variable.get_editor()]);
                 }
 
                 content.appendChild(table.element);

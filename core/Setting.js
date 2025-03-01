@@ -1,7 +1,7 @@
 class Setting
 {
     static instances = {};
-	
+
 	static default_button = 'Console.log("Hello")';
 
     constructor(name, type, initial_value, settings = {}, refresh_ui = true)
@@ -22,20 +22,39 @@ class Setting
 
     display()
     {
-        let settings = {
-            label: this.name,
-            id: "settings-" + this.name,
+		let settings = {
+			label: this.name,
+			id: "settings-" + this.name,
 
-            min: this.settings.min,
-            max: this.settings.max,
+			min: this.settings.min,
+			max: this.settings.max,
 			step: this.settings.integer ? 1.0 : undefined,
 			innerText: this.settings.label,
-        };
+		};
 
-        let [input, label] = create_input(this.type, this.value, settings, (value) => {
-            this.set_value(value);
-            Plot.repaint();
-        });
+		let input, label
+		if (this.type == "table")
+		{
+			settings.innerText = "Open";
+			[input, label] = create_input("button", null, settings, this.table_editor.bind(this));
+		}
+		else
+		{
+			let settings = {
+				label: this.name,
+				id: "settings-" + this.name,
+
+				min: this.settings.min,
+				max: this.settings.max,
+				step: this.settings.integer ? 1.0 : undefined,
+				innerText: this.settings.label,
+			};
+
+			[input, label] = create_input(this.type, this.value, settings, (value) => {
+				this.set_value(value);
+				Plot.repaint();
+			});
+		}
 
         label.style = "margin-right: 30px";
         add_list_element('#settings_list', "display: flex; flex-direction: row", [label, input]);
@@ -60,7 +79,7 @@ class Setting
 
     set_type(type)
     {
-        let allowed = ["number", "range", "checkbox", "button", "text", "lut"];
+        let allowed = ["number", "range", "checkbox", "button", "text", "lut", "table"];
         if (!allowed.includes(type))
         {
             Console.error("Unknown settings type: " + type);
@@ -75,6 +94,112 @@ class Setting
             this.set_value(this.value); // clamp
         }
     }
+
+	table_editor()
+	{
+		Modal.close();
+
+        let content = document.createElement("ul");
+        content.style = "width: 600px";
+
+        let build_settings = (txt_val = "", action_type = 1) => {
+            content.innerHTML = "";
+
+			{
+				let text_area = document.createElement("textarea");
+				text_area.style = "width: 100%";
+				text_area.rows = 4;
+				text_area.value = txt_val;
+
+                let action = create_input("number", action_type, {
+                    values: ["Replace", "Append"],
+                    width: "170px",
+                    style: "flex-wrap: nowrap",
+                }, (new_action) => {
+					action_type = new_action;
+                });
+
+				let parse = create_input("button", null, {innerText: "Parse", style: "margin-bottom: 15px"}, () => {
+					let parsed = parse_table(text_area.value);
+					if (parsed == undefined) return;
+
+					function pad_table(table, value) {
+						let max_len = 0;
+						for (let elem in table)
+							max_len = max(max_len, table[elem].length);
+
+						for (let elem in table)
+						{
+							if (table[elem].length < max_len)
+								table[elem].splice(table[elem].length, 0, ...Array(max_len - table[elem].length).fill(value));
+						}
+					}
+					pad_table(parsed, 0);
+
+					let keys = Object.keys(parsed);
+
+					if (action_type == 0 || typeof this.value !== 'object') // Replace
+					{
+						this.set_value(parsed);
+					}
+					else // Append
+					{
+						let combined = {}
+						let variables = new Set(Object.keys(this.value).concat(Object.keys(parsed)));
+
+						let table0_len = this.value[Object.keys(this.value)[0]].length;
+						let table1_len = parsed[Object.keys(parsed)[0]].length;
+
+						for (let elem of variables)
+						{
+							let row = [];
+							if (elem in this.value)
+								row.splice(row.length, 0, ...this.value[elem]);
+							else
+								row.splice(row.length, 0, ...Array(table0_len).fill(0));
+
+							if (elem in parsed)
+								row.splice(row.length, 0, ...parsed[elem]);
+							else
+								row.splice(row.length, 0, ...Array(table1_len).fill(0));
+
+							combined[elem] = row;
+						}
+
+						this.set_value(combined);
+					}
+
+					build_settings(text_area.value, action_type);
+				});
+
+				content.appendChild(text_area);
+				content.appendChild(wrap(action, parse));
+			}
+
+			if (typeof this.value === 'object')
+			{
+				let headers = Object.keys(this.value);
+				let data = new Table(["variable", "values"], {value: {colSpan: 100}});
+
+				for (let elem in this.value)
+				{
+					let values = this.value[elem];
+					let row = new Array(values.length + 1);
+					row[0] = elem;
+
+					for (let i = 0; i < values.length; i++)
+						row[i + 1] = values[i].toString();
+
+					data.add_row(row);
+				}
+				content.appendChild(data.element);
+			}
+        };
+
+        build_settings();
+        Modal.open("Table Editor", content, () => {
+        });
+	}
 
     static edit()
     {
@@ -91,7 +216,7 @@ class Setting
                 let type_settings = {
                     label: name,
 
-                    values: ["number", "range", "checkbox", "button", "LUT (todo)"],
+                    values: ["number", "range", "checkbox", "button", "LUT (todo)", "table"],
                     width: '150px',
                 };
                 var [type, label] = create_input('dropdown', src.type, type_settings, (new_type) => {
@@ -114,6 +239,10 @@ class Setting
                     settings = create_input("text", Setting.default_button, {}, (txt) => {
 						src.settings.label = txt;
 					});
+                }
+                else if (src.type == "table")
+                {
+                    settings = create_input("button", null, {innerText: "Open"}, src.table_editor.bind(src));
                 }
 
                 add_list_element(content, "display: flex; flex-direction: row", [label, type, settings], (li) => {
@@ -180,7 +309,7 @@ class Setting
             <input type="number" style="padding: 0 8px" class="form-control"
                 id="${name}-res" value="${resolution}">
         `;
-		
+
 		let integ = integer == undefined ? '' : `
             <label for="${name}-int">Integer</label>
             <input type="checkbox" style="padding: 0 8px" class="form-check-input"

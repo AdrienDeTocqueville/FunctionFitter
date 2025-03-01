@@ -193,8 +193,10 @@ function serialize()
         serialized.plots[plot.name] = {
             axis_1: plot.axis_1,
             axis_2: plot.axis_2,
+            scatter_axis: plot.scatter_axis,
             dimensions: plot.dimensions,
             functions: plot.functions,
+            scatter: plot.scatter,
         };
     }
 

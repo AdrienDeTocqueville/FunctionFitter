@@ -49,7 +49,7 @@ let Modal = {
 
         Modal.on_close = on_close;
     },
-    close: () => { Modal.on_close?.(); document.querySelector("#modal").remove(); }
+    close: () => { Modal.on_close?.(); Modal.on_close = null; document.querySelector("#modal")?.remove(); }
 };
 
 class TabList
@@ -92,10 +92,11 @@ class TabList
                 this.active_tab.$element.on_settings();
             }
 
-            settings.style = "position: absolute; top: 12px; right: -5px; width: 20px; text-align: center";
+			settings.style = "position: absolute; top: 12px; right: -5px; width: 20px; text-align: center; display: none";
             this.ul.style = "max-width: calc(100% - 15px)";
             this.element.style = "position: relative";
             this.element.appendChild(settings);
+			this.settings = settings;
         }
     }
 
@@ -117,6 +118,8 @@ class TabList
         }
 
         this.ul.insertBefore(li, this.ul.children[this.ul.childElementCount-1]);
+
+		this.settings.style.display = "block";
 
         this.tabs.push(elem);
 		if (this.content)
@@ -162,6 +165,9 @@ class TabList
 			li.remove();
 			this.repaint();
 		}
+
+		if (this.tabs.length == 0)
+			this.settings.style.display = "none";
 	}
 
     clear()
@@ -178,18 +184,23 @@ class TabList
 
 class Table
 {
-    constructor(headers)
+    constructor(headers, settings)
     {
+		settings = settings|| {};
+
         let table = document.createElement("table");
         table.className = "table table-bordered";
         table.innerHTML = "<thead> <tr></tr> </thead> <tbody></tbody>";
 
         let row = table.querySelector("tr");
-        for (let title of arguments)
+        for (let title of headers)
         {
             let elem = document.createElement("th");
             elem.scope = "col";
             elem.innerText = title;
+			if (settings[title] != undefined)
+				elem.colSpan = settings[title].colSpan;
+
             row.appendChild(elem);
         }
 
@@ -201,14 +212,14 @@ class Table
     {
         let body = this.element.querySelector("tbody");
         let row = document.createElement("tr");
-        for (let i = 0; i < arguments.length; i++)
+        for (let i = 0; i < elements.length; i++)
         {
             let elem = document.createElement(i == 0 ? "th" : "td");
             if (i == 0) elem.scope = "row";
-            if (typeof arguments[i] === "string")
-                elem.innerText = arguments[i];
+            if (typeof elements[i] === "string")
+                elem.innerText = elements[i];
             else
-                elem.appendChild(arguments[i]);
+                elem.appendChild(elements[i]);
             row.appendChild(elem);
         }
         body.appendChild(row);
@@ -521,7 +532,7 @@ function create_input(type, value, settings, onChange)
                 li.innerText = value_i;
                 if (i == active_idx) li.classList.add("active");
                 li.onclick = () => {
-                    ul.children[active_idx].classList.remove('active');
+					if (ul.children[active_idx]) ul.children[active_idx].classList.remove('active');
                     value = value_i;
                     ul.children[i].classList.add('active');
                     update_label();
