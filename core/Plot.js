@@ -217,6 +217,18 @@ class Plot
 				},
 				type: 'scatter'
 			};
+
+			if (0)
+			{
+				trace.type = 'histogram';
+				//trace.autobinx = false;
+				//trace.xbins = {
+				//	start: 0.9,
+				//	end: 1.1,
+				//	size: 0.008,
+
+				//};
+			}
 		}
 		else
 		{

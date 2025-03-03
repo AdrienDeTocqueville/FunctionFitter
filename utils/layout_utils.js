@@ -92,11 +92,11 @@ class TabList
                 this.active_tab.$element.on_settings();
             }
 
-			settings.style = "position: absolute; top: 12px; right: -5px; width: 20px; text-align: center; display: none";
+            settings.style = "position: absolute; top: 12px; right: -5px; width: 20px; text-align: center; display: none";
             this.ul.style = "max-width: calc(100% - 15px)";
             this.element.style = "position: relative";
             this.element.appendChild(settings);
-			this.settings = settings;
+            this.settings = settings;
         }
     }
 
@@ -107,7 +107,7 @@ class TabList
     add_element(elem)
     {
         let li = document.createElement("li");
-		li.$element = elem;
+        li.$element = elem;
         li.className = "nav-item nav-link"
         li.innerText = elem.name;
         li.onclick = () => {
@@ -119,57 +119,57 @@ class TabList
 
         this.ul.insertBefore(li, this.ul.children[this.ul.childElementCount-1]);
 
-		if (this.settings)
-			this.settings.style.display = "block";
+        if (this.settings)
+            this.settings.style.display = "block";
 
         this.tabs.push(elem);
-		if (this.content)
-			li.onclick();
+        if (this.content)
+            li.onclick();
     }
 
-	remove(elem)
-	{
-		let li = undefined;
-		for (let i of this.ul.childNodes)
-		{
-			if (elem == i.$element)
-			{
-				li = i;
-				break;
-			}
-		}
+    remove(elem)
+    {
+        let li = undefined;
+        for (let i of this.ul.childNodes)
+        {
+            if (elem == i.$element)
+            {
+                li = i;
+                break;
+            }
+        }
 
-		let idx = undefined;
-		for (let i = 0; i < this.tabs.length; i++)
-		{
-			if (elem == this.tabs[i])
-			{
-				idx = i;
-				break;
-			}
-		}
-		
-		if (li != undefined && idx != undefined)
-		{
-			if (this.active_tab == li)
-			{
-				this.active_tab = li.previousSibling || li.nextSibling;
-				if (this.active_tab)
-				{
-					if (this.active_tab.$element == null)
-						this.active_tab = null;
-					else
-						this.active_tab.classList.add("active");
-				}
-			}
-			this.tabs.splice(idx, 1);
-			li.remove();
-			this.repaint();
-		}
+        let idx = undefined;
+        for (let i = 0; i < this.tabs.length; i++)
+        {
+            if (elem == this.tabs[i])
+            {
+                idx = i;
+                break;
+            }
+        }
 
-		if (this.settings && this.tabs.length == 0)
-			this.settings.style.display = "none";
-	}
+        if (li != undefined && idx != undefined)
+        {
+            if (this.active_tab == li)
+            {
+                this.active_tab = li.previousSibling || li.nextSibling;
+                if (this.active_tab)
+                {
+                    if (this.active_tab.$element == null)
+                        this.active_tab = null;
+                    else
+                        this.active_tab.classList.add("active");
+                }
+            }
+            this.tabs.splice(idx, 1);
+            li.remove();
+            this.repaint();
+        }
+
+        if (this.settings && this.tabs.length == 0)
+            this.settings.style.display = "none";
+    }
 
     clear()
     {
@@ -180,6 +180,9 @@ class TabList
         this.tabs = [];
         if (this.content)
             this.content.innerHTML = "";
+
+        if (this.settings)
+            this.settings.style.display = "none";
     }
 }
 
@@ -187,7 +190,7 @@ class Table
 {
     constructor(headers, settings)
     {
-		settings = settings|| {};
+        settings = settings|| {};
 
         let table = document.createElement("table");
         table.className = "table table-bordered";
@@ -199,8 +202,8 @@ class Table
             let elem = document.createElement("th");
             elem.scope = "col";
             elem.innerText = title;
-			if (settings[title] != undefined)
-				elem.colSpan = settings[title].colSpan;
+            if (settings[title] != undefined)
+                elem.colSpan = settings[title].colSpan;
 
             row.appendChild(elem);
         }
@@ -533,7 +536,7 @@ function create_input(type, value, settings, onChange)
                 li.innerText = value_i;
                 if (i == active_idx) li.classList.add("active");
                 li.onclick = () => {
-					if (ul.children[active_idx]) ul.children[active_idx].classList.remove('active');
+                    if (ul.children[active_idx]) ul.children[active_idx].classList.remove('active');
                     value = value_i;
                     ul.children[i].classList.add('active');
                     update_label();
@@ -569,14 +572,14 @@ function create_input(type, value, settings, onChange)
         input.appendChild(button);
         input.appendChild(ul);
     }
-	else if (type == "button")
-	{
-		input = document.createElement("button");
-		input.className = "btn btn-secondary";
-		input.style = "margin-left: 8px";
-		input.innerText = settings.innerText;
-		input.onclick = onChange;
-	}
+    else if (type == "button")
+    {
+        input = document.createElement("button");
+        input.className = "btn btn-secondary";
+        input.style = "margin-left: 8px";
+        input.innerText = settings.innerText;
+        input.onclick = onChange;
+    }
     else if (Array.isArray(settings.values))
     {
         if (settings.dropdown == true)
@@ -635,8 +638,8 @@ function create_input(type, value, settings, onChange)
     {
         input.min = settings.min || 0;
         input.max = settings.max || 1;
-		if (settings.step == undefined)
-			input.step = (input.max - input.min) / 256;
+        if (settings.step == undefined)
+            input.step = (input.max - input.min) / 256;
         input.value = value;
 
         let label = document.createElement("label");
@@ -674,13 +677,13 @@ function create_input(type, value, settings, onChange)
             };
             input[props[type]] = value;
             if (onChange)
-				input.onchange = () => onChange(input[props[type]]);
-			if (type == "text" && settings.callback)
-			{
-				input.onkeypress = () => setTimeout(function() {
-					settings.callback(input[props[type]])
-				}, 500);
-			}
+                input.onchange = () => onChange(input[props[type]]);
+            if (type == "text" && settings.callback)
+            {
+                input.onkeypress = () => setTimeout(function() {
+                    settings.callback(input[props[type]])
+                }, 500);
+            }
         }
     }
 
