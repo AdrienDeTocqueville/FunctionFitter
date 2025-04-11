@@ -2,15 +2,30 @@ class Plot
 {
     static tab_list = new TabList('#plot_list', Plot, true);
 
+    static Types = {
+        Line: 'Line',
+        Scatter: 'Scatter',
+        Histogram: 'Histogram',
+    };
+
     constructor(settings = {}, name)
     {
         this.name = name || "Plot " + (Plot.tab_list.tabs.length + 1);
+
+        let to_func = (name) => {
+            return {
+                type: Plot.Types.Line,
+                name,
+            };
+        };
 
         this.functions = settings.functions || [];
         for (let i = 0; i < this.functions.length; i++)
         {
             if (this.functions[i] instanceof Function)
-                this.functions[i] = this.functions[i].name;
+                this.functions[i] = to_func(this.functions[i].name);
+            else if (typeof(this.functions[i]) == "string")
+                this.functions[i] = to_func(this.functions[i]);
         }
 
         this.scatter = settings.scatter || [];
@@ -39,32 +54,28 @@ class Plot
         }
         return this.axis_2;
     }
-	get_scatter_axis() { return this.scatter_axis; }
 
     get_parameters()
     {
         let params = [];
         for (let func of this.functions)
         {
-            if (!(func in Expression.instances))
-                Console.error(func + " is not an Expression");
-            params = params.concat(Expression.instances[func].parameters);
-        }
-		for (let scat of this.scatter)
-		{
-			if (scat in Setting.instances)
-			{
-				for (let key of Object.keys(Setting.instances[scat].value))
+            if (func.name in Expression.instances)
+                params = params.concat(Expression.instances[func.name].parameters);
+            else if (func.name in Setting.instances)
+            {
+				for (let key of Object.keys(Setting.instances[func.name].value))
 					params.push(key);
-			}
-		}
-
+            }
+            else
+                Console.error(func + " is not a Function or a Setting.");
+        }
         return [...new Set(params)]; // Remove duplicates
     }
 
     on_display(parent)
     {
-        if (this.functions.length == 0 && this.scatter.length == 0) return;
+        if (this.functions.length == 0) return;
 
         if (this.element === undefined)
             this.element = document.createElement("div");
@@ -92,12 +103,7 @@ class Plot
     display_plot()
     {
         // Build traces
-        let traces = this.functions.map(name => this.gen_trace(name));
-        let scatter = this.scatter.map(name => this.gen_scatter(name));
-
-		let scatter_axis = this.get_scatter_axis();
-		if (scatter.length == 0 || scatter_axis == undefined)
-			scatter_axis = "";
+        let traces = this.functions.map(func => this.gen_plot(func));
 
         // Build layout
         let layout = { width: this.element.parentNode.clientWidth - 30, uirevision: true };
@@ -106,7 +112,7 @@ class Plot
         {
             let axis_1 = this.get_axis_1();
             layout.xaxis = make_axis(axis_1, Variable.get(axis_1));
-            layout.yaxis = { title: scatter_axis };
+            layout.yaxis = { title: "" };
         }
         else
         {
@@ -115,11 +121,16 @@ class Plot
             layout.scene = {
                 xaxis: make_axis(axis_1, Variable.get(axis_1)),
                 yaxis: make_axis(axis_2, Variable.get(axis_2)),
-                zaxis: { title: scatter_axis },
+                zaxis: { title: "" },
             }
         }
 
-        Plotly.react(this.element, traces.concat(scatter), layout);
+        Plotly.react(this.element, traces, layout);
+    }
+
+    gen_plot(func)
+    {
+        return (func.type == Plot.Types.Line) ? this.gen_trace(func.name) : this.gen_scatter(func);
     }
 
     gen_trace(name)
@@ -181,44 +192,70 @@ class Plot
         return trace;
     }
 
-	gen_scatter(name) {
+	gen_scatter(func)
+    {
+        let axes = this.get_dimensions() == 0 ? [this.get_axis_1()] :
+            [this.get_axis_1(), this.get_axis_2()];
 
-		let data = Setting.instances[name].value;
+		let expr = Expression.instances[func.name];
+        let data = Setting.instances[func.name].value;
 
-		let out_data = data[this.get_scatter_axis()];
-		if (out_data == undefined)
+        // Sanitize output axis
+        let scatter_axis = func.scatter;
+        let variable_names = expr ? expr.parameters : Object.keys(data);
+        if (!variable_names.includes(scatter_axis))
 		{
-			var axis = new Set(Object.keys(data));
-			axis.delete(this.get_axis_1());
-			if (this.get_dimensions() == 1)
-				axis.delete(this.get_axis_2());
+            var axis_opt = new Set(variable_names);
+            for (let axis of axes) axis_opt.delete(axis);
 
-			out_data = data[axis[0]];
-			if (out_data == undefined)
-			{
-				let data_size = data[this.get_axis_1()].length;
-				out_data = new Array(data_size).fill(0);
-			}
+			scatter_axis = axis_opt.values().next().value;
 		}
 
+        // Build dataset for expression
+        if (expr)
+        {
+            data = {};
+            data[scatter_axis] = [];
+            for (let axis of axes)
+                data[axis] = [];
 
-        let trace;
+            for (let i = 0; i < func.sample_count || 64; i++)
+            {
+                let sample = expr.function(i);
+
+                data[scatter_axis].push(sample[scatter_axis]);
+                for (let axis of axes)
+                    data[axis].push(sample[axis]);
+            }
+        }
+
+        // Create dummy data if we have nothing
+        let out_data = data[scatter_axis];
+        if (out_data == undefined)
+        {
+            let data_size = data[axes[0]].length;
+            out_data = new Array(data_size).fill(0);
+        }
+
+        // Generate trace
+        let trace = {
+            mode: 'markers',
+            marker: {
+                size: 5,
+                line: {
+                    width: 0.5
+                },
+                opacity: 0.8
+            },
+        };
+
         if (this.get_dimensions() == 0)
 		{
-			trace = {
-				x: data[this.get_axis_1()], y: out_data,
-				mode: 'markers',
-				marker: {
-					size: 5,
-					line: {
-						width: 0.5
-					},
-					opacity: 0.8
-				},
-				type: 'scatter'
-			};
+			trace.type = 'scatter';
+			trace.x = data[axes[0]];
+            trace.y = out_data;
 
-			if (0)
+			if (func.type == Plot.Types.Histogram)
 			{
 				trace.type = 'histogram';
 				//trace.autobinx = false;
@@ -232,21 +269,13 @@ class Plot
 		}
 		else
 		{
-			trace = {
-				x: data[this.get_axis_1()], y: data[this.get_axis_2()], z: out_data,
-				mode: 'markers',
-				marker: {
-					size: 5,
-					line: {
-						width: 0.5
-					},
-					opacity: 0.8
-				},
-				type: 'scatter3d'
-			};
+			trace.type = 'scatter3d';
+			trace.x = data[axes[0]];
+			trace.y = data[axes[1]];
+            trace.z = out_data;
 		}
 
-			
+
 		return trace;
 	}
 
@@ -257,81 +286,96 @@ class Plot
 
         let build_settings = () => {
             content.innerHTML = "";
-			
+
 			// Sanitize settings
 			if (!this.get_parameters().includes(this.get_axis_1()))
 				this.axis_1 = undefined;
 
+            var src_choices = Object.keys(Expression.instances);
+            for (let setting in Setting.instances)
             {
-                let func_settings = {
-                    values: Object.keys(Expression.instances),
-                    label: "Functions",
-                    id: "functions",
-                    width: "200px",
-                };
-                let dropdown = create_input("dropdown", this.functions, func_settings, (new_selection) => {
-                    this.functions = new_selection;
-                    build_settings();
-                });
-
-				dropdown[1].style.width = "90px";
-                content.appendChild(wrap(dropdown[1], dropdown[0]));
+                if (Setting.instances[setting].type == 'table')
+                    src_choices.push(setting);
             }
 
+            let list = document.createElement("ul");
+            list.className = "list-group";
+
+            for (let i = 0; i < this.functions.length; i++)
             {
-				// Figure out possible values
-				let scatter_values = Object.keys(Expression.instances);
-				for (let setting in Setting.instances)
-				{
-					if (Setting.instances[setting].type == 'table')
-						scatter_values.push(setting);
-				}
+                let elem = document.createElement("li");
+                elem.className = "list-group-item";
+                elem.style = "display: flex";
 
-				let axis_values = new Set();
-				for (let setting in Setting.instances)
-				{
-					for (let key of Object.keys(Setting.instances[setting].value))
-						axis_values.add(key);
-				}
-				axis_values = Array.from(axis_values);
-				axis_values.splice(0, 0, undefined);
-
-				// Input choice dropdown
-                let scatter_settings = {
-                    values: scatter_values,
-                    label: "Scatter",
-                    id: "scatter",
-                    width: "200px",
+                // Function choice
+                let src_settings = {
+                    values: src_choices,
+                    width: "150px",
                 };
-                let dropdown = create_input("dropdown", this.scatter, scatter_settings, (new_selection) => {
-                    this.scatter = new_selection;
+                elem.appendChild(create_input("dropdown", this.functions[i].name, src_settings, (new_name) => {
+                    this.functions[i].name = new_name;
                     build_settings();
-                });
+                }));
 
-				// Output choice dropdown
-                let axis_settings = {
-                    label: "Scatter Axis",
-					values: axis_values,
-                    //disabled_values: [this.get_axis_2()],
-                    style: "min-width: 80px",
-                    width: "unset",
+                let expr = Expression.instances[this.functions[i].name];
+
+                // Type
+                let type_settings = {
+                    values: [Plot.Types.Line, Plot.Types.Scatter, Plot.Types.Histogram],
+                    disabled_values: [],
+                    width: "100px",
                 };
-                let axis = create_input("dropdown", this.get_scatter_axis(), axis_settings, (new_axis) => {
-                    this.scatter_axis = new_axis;
+
+                {
+                    let prevent_line = expr ? expr.is_scatter() : true;
+                    let prevent_scatter = expr ? !expr.is_scatter() : false;
+                    let prevent_histogram = prevent_scatter || this.get_dimensions() == 1;
+
+                    if (this.functions[i].type == Plot.Types.Line && prevent_line) this.functions[i].type = prevent_scatter ? Plot.Types.Histogram : Plot.Types.Scatter;
+                    if (this.functions[i].type == Plot.Types.Scatter && prevent_scatter) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
+                    if (this.functions[i].type == Plot.Types.Histogram && prevent_histogram) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
+
+                    if (prevent_line) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Line);
+                    if (prevent_scatter) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Scatter);
+                    if (prevent_histogram) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Histogram);
+                }
+
+                elem.appendChild(create_input("dropdown", this.functions[i].type, type_settings, (new_type) => {
+                    this.functions[i].type = new_type;
                     build_settings();
-                });
-                let axis_drop = wrap(axis[1], axis[0]);
+                }));
 
-				// UI formatting
-				dropdown[1].style.width = "90px";
-				let scatter_drop = wrap(dropdown[1], dropdown[0]);
-				scatter_drop.style = "margin-top: 10px";
+				// Scatter choice
+                if (this.functions[i].type != Plot.Types.Line)
+                {
+                    let scatter_settings = { label: "Axis" };
+                    if (expr)
+                    {
+                        let sample_count = create_input("number", this.functions[i].sample_count || 64, { label: "Sample Count" }, (new_count) => {
+                            this.functions[i].sample_count = new_count;
+                        });
+                        elem.appendChild(wrap(sample_count[1], sample_count[0]));
 
-                let elem = wrap(scatter_drop, axis_drop);
-                content.appendChild(elem);
-                elem.style = "justify-content: space-between";
+                        scatter_settings.values = Expression.instances[func.name].parameters;
+                    }
+                    else
+                    {
+                        scatter_settings.values = Object.keys(Setting.instances[this.functions[i].name].value);
+                    }
+
+                    scatter_settings.values = [undefined].concat(scatter_settings.values);
+                    let axis = create_input("dropdown", this.functions[i].scatter, scatter_settings, (new_scatter) => {
+                        this.functions[i].scatter = new_scatter;
+                        build_settings();
+                    });
+                    elem.appendChild(wrap(axis[1], axis[0]));
+                }
+
+
+				list.appendChild(elem);
             }
 
+            content.appendChild(list);
             content.appendChild(document.createElement("br"));
 
             {

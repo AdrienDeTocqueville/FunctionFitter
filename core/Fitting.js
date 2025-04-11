@@ -150,7 +150,7 @@ class Fitting
         for (let name in Expression.instances)
         {
             let expr = Expression.instances[name];
-            if (expr.is_function)
+            if (expr.type != Expression.Types.Unnamed)
                 globals[name] = expr.source;
         }
 

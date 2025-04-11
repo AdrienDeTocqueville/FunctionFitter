@@ -34,6 +34,9 @@ function log10(x)       { return element_wise(Math.log10, [x]); }
 function log(x)         { return element_wise(Math.log, [x]); }
 function exp(x)         { return element_wise(Math.exp, [x]); }
 function abs(x)         { return element_wise(Math.abs, [x]); }
+function sin(a, b)      { return element_wise(Math.sin, [a, b]); }
+function cos(a, b)      { return element_wise(Math.cos, [a, b]); }
+function sq(x)          { return element_wise((x) => x*x, [x]); }
 function saturate(x)    { return element_wise((x) => Math.max(0, Math.min(x, 1)), [x]); }
 function clamp(x, a, b) { return element_wise((x, a, b) => Math.max(a, Math.min(x, b)), [x], [a, b]); }
 function frac(x)        { return element_wise((x) => x - Math.trunc(x), [x]); }
@@ -60,7 +63,7 @@ const vec_proxy = {
 	{
 		let i = ["x", "y", "z", "w"].indexOf(prop);
 		if (0 <= i && i <= target.length) prop = i;
-    	target[prop] = value;
+        return Reflect.set(target, prop, value);
   	},
 };
 

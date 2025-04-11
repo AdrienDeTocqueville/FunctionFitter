@@ -2,12 +2,18 @@ class Expression
 {
     static instances = {};
 
+    static Types = {
+        Unnamed: 0,
+        Function: 1,
+        Scatter: 2,
+    };
+
     constructor(source, name)
     {
         this.name = name;
-        this.is_function = (name == undefined);
+        this.type = (name == undefined) ? Expression.Types.Function : Expression.Types.Unnamed;
         this.set_source(source);
-        if (this.is_function)
+        if (this.type != Expression.Types.Unnamed)
             this.create_editor();
 
         if (source == undefined)
@@ -18,7 +24,7 @@ class Expression
 
     set_source(source)
     {
-        if (this.is_function)
+        if (this.type != Expression.Types.Unnamed)
         {
             try {
                 if (source instanceof Function) source = source.toString();
@@ -72,7 +78,32 @@ class Expression
         let parameters = argDecl[1].split(FN_ARG_SPLIT);
         for (let i = 0; i < parameters.length; i++)
             parameters[i] = parameters[i].trim();
+
+        if (parameters.length == 1 && parameters[0] == "sample")
+        {
+            try
+            {
+                let result = this.function();
+                parameters = Object.Keys(result);
+            }
+            catch (error)
+            {
+                Console.error(`Failed to parse scatter variables for function ${name}.`);
+            }
+
+            this.type = Expression.Types.Scatter;
+        }
+        else
+        {
+            this.type = Expression.Types.Function;
+        }
+
         this.parameters = parameters;
+    }
+
+    is_scatter()
+    {
+        return this.type == Expression.Types.Scatter;
     }
 
     create_editor()
@@ -175,7 +206,7 @@ class Expression
             definitions = `let ${sorted.map(v => v.name + "=" + v.value).join(',')};`;
         }
 
-        let body = !this.is_function ? `${definitions} return ${this.source}` :
+        let body = this.type == Expression.Types.Unnamed ? `${definitions} return ${this.source}` :
             `${definitions} return ${this.name}(${this.parameters.join(',')})`
         return new Function(axes, body);
     }
@@ -191,7 +222,7 @@ class Expression
             for (let name in Expression.instances)
             {
                 let func = Expression.instances[name];
-				if (!func.is_function)
+				if (func.type == Expression.Types.Unnamed)
 					continue;
 
 				var label = document.createElement("p");
@@ -236,7 +267,7 @@ class Expression
             for (let name in Expression.instances)
             {
                 let func = Expression.instances[name];
-				if (func.is_function)
+				if (func.type != Expression.Types.Unnamed)
 					func.create_editor();
             }
         });

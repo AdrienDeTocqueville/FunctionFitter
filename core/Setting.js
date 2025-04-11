@@ -102,7 +102,7 @@ class Setting
         let content = document.createElement("ul");
         content.style = "width: 600px";
 
-        let build_settings = (txt_val = "", action_type = 1) => {
+        let build_settings = (txt_val = "", action_type = 0) => {
             content.innerHTML = "";
 
 			{
@@ -179,15 +179,24 @@ class Setting
 			if (typeof this.value === 'object')
 			{
 				let headers = Object.keys(this.value);
-				let data = new Table(["variable", "values"], {values: {colSpan: 100}});
+                let value_name = "values";
 
+                let max_row_size = 64;
+                let data_size = this.value[headers[0]].length;
+                if (data_size > max_row_size)
+                {
+                    value_name += ` (showing ${max_row_size} of ${data_size}...)`
+                    data_size = max_row_size;
+                }
+
+				let data = new Table(["variable", value_name], {values: {colSpan: 100}});
 				for (let elem in this.value)
 				{
 					let values = this.value[elem];
-					let row = new Array(values.length + 1);
+					let row = new Array(data_size + 1);
 					row[0] = elem;
 
-					for (let i = 0; i < values.length; i++)
+					for (let i = 0; i < data_size; i++)
 						row[i + 1] = values[i].toString();
 
 					data.add_row(row);
