@@ -384,11 +384,6 @@ class Plot
                         let scatter_settings = { label: "Axis", undefined_value: "Auto" };
                         if (expr)
                         {
-                            let sample_count = create_input("number", func.sample_count || 64, { label: "Samples", width: "50px" }, (new_count) => {
-                                func.sample_count = new_count;
-                            });
-                            li.appendChild(wrap(sample_count[1], sample_count[0]));
-
                             scatter_settings.values = expr.parameters;
                         }
                         else
@@ -402,6 +397,15 @@ class Plot
                             build_settings();
                         });
                         li.appendChild(wrap(axis[1], axis[0]));
+
+                        if (expr)
+                        {
+                            let sample_count = create_input("number", func.sample_count || 64, { label: "Samples", width: "50px" }, (new_count) => {
+                                func.sample_count = new_count;
+                            });
+                            li.appendChild(wrap(sample_count[1], sample_count[0]));
+                        }
+
                     }
                 }
 

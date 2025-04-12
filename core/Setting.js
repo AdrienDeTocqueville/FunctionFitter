@@ -273,6 +273,7 @@ class Setting
                     src.set_type(new_type)
                     build_settings();
                 });
+                label.style = "min-width: 100px";
 
                 let settings;
                 if (src.type == "range")
@@ -362,7 +363,7 @@ class Setting
 
 		let integ = integer == undefined ? '' : `
             <label for="${name}-int">Integer</label>
-            <input type="checkbox" style="padding: 0 8px" class="form-check-input"
+            <input type="checkbox" style="padding: 8px" class="form-check-input"
                 id="${name}-int" value="${integer}">
         `;
 

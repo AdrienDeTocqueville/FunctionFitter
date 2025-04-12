@@ -21,8 +21,15 @@ class Fitting
         let repaint = () => {
             parent.innerHTML = "";
 
+            let expr = Expression.instances[this.ref];
+            let setting = Setting.instances[this.ref];
+            let is_scatter = (!expr || expr.is_scatter());
+
             // Inputs
-            let inputs = Expression.instances[this.ref].parameters;
+            let inputs = expr ? expr.parameters : Object.keys(setting.value);
+            if (is_scatter)
+                inputs = inputs.filter((i) => i != this.scatter);
+            else
             {
                 let input_table = new Table(["Input", "Settings"]);
                 for (let i = 0; i < inputs.length; i++)
@@ -64,7 +71,14 @@ class Fitting
             // Reference
 
             let block = document.createElement("div");
-            block.style = "border: 1px solid rgba(0, 0, 0, .125); position: relative; padding-bottom: 3.25rem;";
+            block.style = "border: 1px solid rgba(0, 0, 0, .125); position: relative; padding: 8px 0px 2.75rem 8px;";
+
+            let add_param = (param) => {
+                param[1].style.width = "120px";
+                param = wrap(param[1], param[0]);
+                param.style = "padding-bottom: .5rem;";
+                block.appendChild(param);
+            }
 
             var ref_choices = Object.keys(Expression.instances);
             for (let setting in Setting.instances)
@@ -79,18 +93,13 @@ class Fitting
                 label: "Reference",
                 id: "ref-button",
             };
-            let ref = create_input("dropdown", this.ref, ref_settings, (r) => {
+            add_param(create_input("dropdown", this.ref, ref_settings, (r) => {
                 this.ref = r;
                 repaint();
-            });
+            }));
 
-            ref[1].style.width = "120px";
-            ref = wrap(ref[1], ref[0]);
-            ref.style = "padding-top: .5rem; padding-left: 8px";
-            block.appendChild(ref);
-
-            let expr = Expression.instances[this.ref];
-            if (!expr || expr.is_scatter())
+            let valid_ref = true;
+            if (is_scatter)
             {
                 let scatter_settings = { label: "Axis" };
 
@@ -100,23 +109,31 @@ class Fitting
                     scatter_settings.values = Object.keys(Setting.instances[this.ref].value);
 
                 if (scatter_settings.length != 0 && !scatter_settings.values.includes(this.scatter))
+                {
                     this.scatter = scatter_settings.values[0];
+                    return repaint();
+                }
 
-                let axis = create_input("dropdown", this.scatter, scatter_settings, (new_scatter) => {
+                add_param(create_input("dropdown", this.scatter, scatter_settings, (new_scatter) => {
                     this.scatter = new_scatter;
-                });
+                    repaint();
+                }));
 
-                axis[1].style.width = "120px";
-                axis = wrap(axis[1], axis[0]);
-                axis.style = "padding-top: .5rem; padding-left: 8px";
-                block.appendChild(axis);
+                if (expr)
+                {
+                    add_param(create_input("number", this.samples || 1024, { label: "Samples" }, (new_count) => {
+                        this.samples = new_count;
+                    }));
+                }
+
+                valid_ref &= this.scatter != undefined;
             }
 
             let fit_button = document.createElement("button");
             fit_button.className = "btn btn-sm btn-primary";
             fit_button.type = "button";
             fit_button.innerText = "Fit function";
-            fit_button.disabled = this.worker != null;
+            fit_button.disabled = this.worker != null || !valid_ref;
             fit_button.style = "position: absolute; bottom: .5rem; right: 8px";
             fit_button.onclick = () => {
                 this.fit();
@@ -143,15 +160,25 @@ class Fitting
 
         this.worker.onerror = (e) => Console.error(e);
 
-        // Find input axes
-        let ref = Expression.instances[this.ref];
-        let axes = ref.parameters .filter(v => !this.constant.has(v)) .map(v => Variable.get(v));
-        let axis_count = axes.length;
+        let expr = Expression.instances[this.ref];
+        let setting = Setting.instances[this.ref];
+        let is_scatter = (!expr || expr.is_scatter());
 
-        // Build dataset
-        let dataset = this.build_dataset(axes, ref.compile(axes));
+        let axes, dataset;
+        if (is_scatter)
+        {
+            axes = ref.parameters .filter(v => v != this.scatter) .map(v => Variable.get(v));
+            dataset = this.build_scatter_dataset(axes, expr, setting);
+        }
+        else
+        {
+            let ref = Expression.instances[this.ref];
+            axes = ref.parameters .filter(v => !this.constant.has(v)) .map(v => Variable.get(v));
+            dataset = this.build_dataset(axes, ref.compile(axes));
+        }
 
         // Compute initial values
+        let axis_count = axes.length;
         let initial_values = [];
         for (let v of Variable.get_dependencies(this.expression.parameters, axes))
         {
@@ -195,6 +222,55 @@ class Fitting
         // Start async process
         let model = this.expression.compile(axes);
         this.worker.postMessage({ model: model.toString(), initial_values, dataset, globals });
+    }
+
+    build_scatter_dataset(axes, expr, setting)
+    {
+        let num_axis = axes.length;
+
+        let x_values, y_values;
+
+        if (expr)
+        {
+            let count = this.samples || 1024;
+            x_values = new Array(count);
+            y_values = new Array(count);
+
+            try {
+
+                for (let i = 0; i < count; i++)
+                {
+                    let sample = expr.function(i);
+
+                    x_values[i] = new Array(num_axis);
+                    for (let j = 0; j < num_axis; j++)
+                    {
+                        let val = sample[axes[j].name];
+                        x_values[j] = val != undefined ? val : 0;
+                    }
+
+                    y_values = sample[this.scatter];
+                }
+            } catch (error) {
+                Console.error(expr.name + ': ' + error, expr.name);
+            }
+        }
+        else
+        {
+            y_values = setting.value[this.scatter];
+            x_values = new Array(y_values.length);
+
+            for (let i = 0; i < x_values.length; i++)
+            {
+                for (let j = 0; j < num_axis; j++)
+                {
+                    let val = setting.value[axes[j].name];
+                    x_values[j] = val != undefined ? val : 0;
+                }
+            }
+        }
+
+        return {x_values, y_values};
     }
 
     build_dataset(axes, ref)

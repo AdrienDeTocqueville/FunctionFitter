@@ -686,8 +686,9 @@ function create_input(type, value, settings, onChange)
     }
     else
     {
-        let style = (type == 'checkbox') ? "margin-right: 5px;" :
-            `width: ${width}; padding: 0 8px;`;
+        let style = `width: ${width}; padding: 0 8px; margin-right: 8px;`;
+        if (type == 'checkbox') style = "margin-right: 5px;";
+        if (type == 'dropdown') style = `width: ${width}; margin-right: 8px;`;
         if (settings.style != undefined)
             style += settings.style;
         input.style = style;
