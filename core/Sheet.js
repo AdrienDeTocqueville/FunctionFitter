@@ -42,18 +42,6 @@ class Sheet
             Sheet.code_editor.session.setMode("ace/mode/javascript");
             Sheet.code_editor.renderer.setScrollMargin(4, 0);
 
-            /*
-            let refresher, self = this;
-            Sheet.code_editor.session.on('change', function(delta) {
-                clearTimeout(refresher);
-                refresher = setTimeout(function() {
-                    for (let annotation of Sheet.code_editor.getSession().getAnnotations())
-                        if (annotation.type == "error") return;
-                    self.set_source(Sheet.code_editor.getValue());
-                }, 500);
-            });
-            */
-
             document.querySelector("#sheet-view > button").onclick = Sheet.close_editor;
         }
 

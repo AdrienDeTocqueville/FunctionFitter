@@ -44,8 +44,11 @@ class Expression
                 this.name = this.function.name;
                 Expression.instances[this.name] = this;
                 window[this.name] = this.function;
+
+                // Remove previous compilation error messages
+                Console.clear(this.name);
             } catch (error) {
-                Console.error(error);
+                Console.error(error, this.name);
                 return false;
             }
         }
@@ -84,7 +87,7 @@ class Expression
             try
             {
                 let result = this.function();
-                parameters = Object.Keys(result);
+                parameters = Object.keys(result);
             }
             catch (error)
             {
@@ -129,58 +132,37 @@ class Expression
 		div.className = 'function-editor';
         div.innerHTML = this.source;
 
-        let handle = document.createElement("div");
-		handle.className = 'resize-handle';
+        add_list_element('#function_list', "", [div]);
 
-        let container = wrap(handle, div);
-		container.className = 'editor-container';
-        container.style = `height: ${line_count*16.3 + 8}px`;
-        add_list_element('#function_list', "", [container]);
+		let editor = this.create_resizable_editor(div)
 
-		let editor = this.create_resizable_editor(div, handle)
+        let has_changed = false, self = this;
+        editor.session.on('change', function() {
+            has_changed = true;
+            //for (let annotation of editor.getSession().getAnnotations())
+            //    if (annotation.type == "error") return;
+        });
 
-        let refresher, self = this;
-        editor.session.on('change', function(delta) {
-            clearTimeout(refresher);
-            refresher = setTimeout(function() {
-                for (let annotation of editor.getSession().getAnnotations())
-                    if (annotation.type == "error") return;
-                self.set_source(editor.getValue());
-            }, 500);
+        editor.on('blur', function() {
+            if (!has_changed) return;
+            if (self.set_source(editor.getValue()))
+                repaint_all();
+            has_changed = false;
+
         });
     }
 	
-	create_resizable_editor(div, handle)
+	create_resizable_editor(div)
 	{
         let editor = ace.edit(div);
         editor.setTheme("ace/theme/monokai");
         editor.session.setMode("ace/mode/javascript");
         editor.renderer.setScrollMargin(4, 0);
 
-		let isResizing = false;
-		let startY;
-		let startHeight;
-
-		handle.addEventListener('mousedown', (e) => {
-			isResizing = true;
-			startY = e.clientY;
-			startHeight = div.parentNode.offsetHeight;
-			document.body.style.cursor = 'ns-resize';
-		});
-
-		document.addEventListener('mousemove', (e) => {
-			if (!isResizing) return;
-
-			const diff = e.clientY - startY;
-			let newHeight = startHeight + diff;
-			newHeight = max(newHeight, 74); // approx 3 lines
-			div.parentNode.style.height = newHeight + 'px';
-		});
-
-		document.addEventListener('mouseup', () => {
-			isResizing = false;
-			document.body.style.cursor = '';
-		});
+        editor.setOptions({
+            maxLines: 20,
+            minLines: 5,
+        });
 
 		return editor;
 	}

@@ -54,6 +54,26 @@ class Plot
         }
         return this.axis_2;
     }
+    get_scatter_axis(name, hint)
+    {
+		let expr = Expression.instances[name];
+        let setting = Setting.instances[name];
+
+        let scatter_axis = hint;
+        let variable_names = expr ? expr.parameters : Object.keys(setting.value);
+        if (!variable_names.includes(scatter_axis))
+		{
+            let axes = this.get_dimensions() == 0 ? [this.get_axis_1()] :
+                [this.get_axis_1(), this.get_axis_2()];
+
+            var axis_opt = new Set(variable_names);
+            for (let axis of axes) axis_opt.delete(axis);
+
+			scatter_axis = axis_opt.values().next().value;
+		}
+
+        return scatter_axis;
+    }
 
     get_parameters()
     {
@@ -130,7 +150,9 @@ class Plot
 
     gen_plot(func)
     {
-        return (func.type == Plot.Types.Line) ? this.gen_trace(func.name) : this.gen_scatter(func);
+        let trace = (func.type == Plot.Types.Line) ? this.gen_trace(func.name) : this.gen_scatter(func);
+        trace.name = func.name;
+        return trace;
     }
 
     gen_trace(name)
@@ -162,7 +184,7 @@ class Plot
                 for (let i = 0; i < axes[0].resolution; i++)
                     trace.y[i] = model(trace.x[i]);
             } catch (error) {
-                Console.error(name + ': ' + error);
+                Console.error(name + ': ' + error, name);
             }
         }
         else
@@ -182,13 +204,12 @@ class Plot
                         trace.z[j][i] = model(trace.x[i], trace.y[j]);
                 }
             } catch (error) {
-                Console.error(name + ': ' + error);
+                Console.error(name + ': ' + error, name);
                 for (let j = 0; j < axes[1].resolution; j++)
                     trace.z[j] = new Array(axes[0].resolution);
             }
         }
 
-        trace.name = name;
         return trace;
     }
 
@@ -197,21 +218,12 @@ class Plot
         let axes = this.get_dimensions() == 0 ? [this.get_axis_1()] :
             [this.get_axis_1(), this.get_axis_2()];
 
-		let expr = Expression.instances[func.name];
-        let data = Setting.instances[func.name].value;
-
-        // Sanitize output axis
-        let scatter_axis = func.scatter;
-        let variable_names = expr ? expr.parameters : Object.keys(data);
-        if (!variable_names.includes(scatter_axis))
-		{
-            var axis_opt = new Set(variable_names);
-            for (let axis of axes) axis_opt.delete(axis);
-
-			scatter_axis = axis_opt.values().next().value;
-		}
+        let scatter_axis = this.get_scatter_axis(func.name, func.scatter);
 
         // Build dataset for expression
+        let data;
+		let expr = Expression.instances[func.name];
+        let setting = Setting.instances[func.name];
         if (expr)
         {
             data = {};
@@ -219,15 +231,25 @@ class Plot
             for (let axis of axes)
                 data[axis] = [];
 
-            for (let i = 0; i < func.sample_count || 64; i++)
-            {
-                let sample = expr.function(i);
+            try {
+                let count = func.sample_count > 0 ? func.sample_count : 64;
+                for (let i = 0; i < count; i++)
+                {
+                    let sample = expr.function(i);
 
-                data[scatter_axis].push(sample[scatter_axis]);
-                for (let axis of axes)
-                    data[axis].push(sample[axis]);
+                    data[scatter_axis].push(sample[scatter_axis]);
+                    for (let axis of axes)
+                    {
+                        let val = sample[axis];
+                        data[axis].push(val != undefined ? val : 0);
+                    }
+                }
+            } catch (error) {
+                Console.error(func.name + ': ' + error, func.name);
             }
         }
+        else
+            data = setting.value;
 
         // Create dummy data if we have nothing
         let out_data = data[scatter_axis];
@@ -274,7 +296,6 @@ class Plot
 			trace.y = data[axes[1]];
             trace.z = out_data;
 		}
-
 
 		return trace;
 	}
@@ -348,7 +369,7 @@ class Plot
 				// Scatter choice
                 if (this.functions[i].type != Plot.Types.Line)
                 {
-                    let scatter_settings = { label: "Axis" };
+                    let scatter_settings = { label: "Axis", undefined_value: "Auto" };
                     if (expr)
                     {
                         let sample_count = create_input("number", this.functions[i].sample_count || 64, { label: "Sample Count" }, (new_count) => {
@@ -356,7 +377,7 @@ class Plot
                         });
                         elem.appendChild(wrap(sample_count[1], sample_count[0]));
 
-                        scatter_settings.values = Expression.instances[func.name].parameters;
+                        scatter_settings.values = Expression.instances[this.functions[i].name].parameters;
                     }
                     else
                     {

@@ -28,6 +28,8 @@ function add_list_element(list, style, children, on_delete)
         list = document.querySelector(list);
 
     list.appendChild(li);
+
+    return li;
 }
 
 let Modal = {
@@ -457,12 +459,20 @@ function create_editor(content, on_change)
     }
     set_color("default");
 
+    let has_changed = false;
     editor.on("focus", () => { cursor.style.display = "unset"; set_color("active"); });
-    editor.on("blur", validate);
+    editor.on("blur", () => {
+        if (has_changed)
+            validate();
+        else
+            set_color("default");
+        has_changed = false;
+    }); 
 
     // On change
     let refresher;
     editor.session.on('change', function(delta) {
+        has_changed = true;
         clearTimeout(refresher);
         refresher = setTimeout(function() {
             for (let annotation of editor.getSession().getAnnotations())
@@ -514,7 +524,7 @@ function create_input(type, value, settings, onChange)
 
         let multiselect = Array.isArray(value);
         let update_label = () => {
-            if (!multiselect) return button.innerText = value;
+            if (!multiselect) return button.innerText = value != undefined ? value : settings.undefined_value;
             let label = "";
             for (let val of value)
                 label += (label != "" ? ", " : "") + val;
@@ -533,7 +543,7 @@ function create_input(type, value, settings, onChange)
             li.className = "dropdown-item" + (disabled ? " disabled" : "");
             if (!multiselect)
             {
-                li.innerText = value_i;
+                li.innerText = value_i != undefined ? value_i : settings.undefined_value;
                 if (i == active_idx) li.classList.add("active");
                 li.onclick = () => {
                     if (ul.children[active_idx]) ul.children[active_idx].classList.remove('active');
