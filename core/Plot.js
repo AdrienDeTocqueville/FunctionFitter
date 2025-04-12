@@ -326,22 +326,27 @@ class Plot
             let list = document.createElement("ul");
             list.className = "list-group";
 
-            for (let i = 0; i < this.functions.length; i++)
+            for (let i = 0; i < this.functions.length + 1; i++)
             {
-                let expr = Expression.instances[this.functions[i].name];
-                let setting = Setting.instances[this.functions[i].name];
+                let func = i < this.functions.length ? this.functions[i] : { name: undefined, type: Plot.Types.Line };
+                let expr = Expression.instances[func.name];
+                let setting = Setting.instances[func.name];
 
-                let elem = document.createElement("li");
-                elem.className = "list-group-item";
-                elem.style = "display: flex";
+                let li = document.createElement("li");
+                li.className = "list-group-item";
+                li.style = "display: flex";
 
                 // Function choice
                 let src_settings = {
                     values: src_choices,
+                    undefined_value: "Add function...",
                     width: "150px",
                 };
-                elem.appendChild(create_input("dropdown", this.functions[i].name, src_settings, (new_name) => {
-                    this.functions[i].name = new_name;
+                li.appendChild(create_input("dropdown", func.name, src_settings, (new_name) => {
+                    func.name = new_name;
+                    if (i == this.functions.length)
+                        this.functions.push(func);
+
                     build_settings();
                 }));
 
@@ -359,61 +364,66 @@ class Plot
                         let prevent_scatter = expr ? !expr.is_scatter() : false;
                         let prevent_histogram = prevent_scatter || this.get_dimensions() == 1;
 
-                        if (this.functions[i].type == Plot.Types.Line && prevent_line) this.functions[i].type = prevent_scatter ? Plot.Types.Histogram : Plot.Types.Scatter;
-                        if (this.functions[i].type == Plot.Types.Scatter && prevent_scatter) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
-                        if (this.functions[i].type == Plot.Types.Histogram && prevent_histogram) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
+                        if (func.type == Plot.Types.Line && prevent_line) func.type = prevent_scatter ? Plot.Types.Histogram : Plot.Types.Scatter;
+                        if (func.type == Plot.Types.Scatter && prevent_scatter) func.type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
+                        if (func.type == Plot.Types.Histogram && prevent_histogram) func.type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
 
                         if (prevent_line) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Line);
                         if (prevent_scatter) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Scatter);
                         if (prevent_histogram) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Histogram);
                     }
 
-                    elem.appendChild(create_input("dropdown", this.functions[i].type, type_settings, (new_type) => {
-                        this.functions[i].type = new_type;
+                    li.appendChild(create_input("dropdown", func.type, type_settings, (new_type) => {
+                        func.type = new_type;
                         build_settings();
                     }));
 
                     // Scatter choice
-                    if (this.functions[i].type != Plot.Types.Line)
+                    if (func.type != Plot.Types.Line)
                     {
                         let scatter_settings = { label: "Axis", undefined_value: "Auto" };
                         if (expr)
                         {
-                            let sample_count = create_input("number", this.functions[i].sample_count || 64, { label: "Sample Count" }, (new_count) => {
-                                this.functions[i].sample_count = new_count;
+                            let sample_count = create_input("number", func.sample_count || 64, { label: "Samples", width: "50px" }, (new_count) => {
+                                func.sample_count = new_count;
                             });
-                            elem.appendChild(wrap(sample_count[1], sample_count[0]));
+                            li.appendChild(wrap(sample_count[1], sample_count[0]));
 
                             scatter_settings.values = expr.parameters;
                         }
                         else
                         {
-                            scatter_settings.values = Object.keys(Setting.instances[this.functions[i].name].value);
+                            scatter_settings.values = Object.keys(Setting.instances[func.name].value);
                         }
 
                         scatter_settings.values = [undefined].concat(scatter_settings.values);
-                        let axis = create_input("dropdown", this.functions[i].scatter, scatter_settings, (new_scatter) => {
-                            this.functions[i].scatter = new_scatter;
+                        let axis = create_input("dropdown", func.scatter, scatter_settings, (new_scatter) => {
+                            func.scatter = new_scatter;
                             build_settings();
                         });
-                        elem.appendChild(wrap(axis[1], axis[0]));
+                        li.appendChild(wrap(axis[1], axis[0]));
                     }
                 }
 
                 // Remove
-                let cross = document.createElement("span");
-                cross.className = "close2";
-                cross.innerHTML = "&times;";
-                cross.onclick = () => {
-                    this.functions.splice(i, 1);
-                    build_settings();
-                };
-                elem.appendChild(cross);
+                if (i < this.functions.length)
+                {
+                    let cross = document.createElement("span");
+                    cross.className = "close2";
+                    cross.innerHTML = "&times;";
+                    cross.onclick = () => {
+                        this.functions.splice(i, 1);
+                        build_settings();
+                    };
 
-				list.appendChild(elem);
+                    li.appendChild(cross);
+                }
+
+				list.appendChild(li);
             }
 
             content.appendChild(list);
+
             content.appendChild(document.createElement("br"));
 
             {
