@@ -151,18 +151,20 @@ class Expression
 
         });
     }
-	
+
 	create_resizable_editor(div)
 	{
         let editor = ace.edit(div);
-        editor.setTheme("ace/theme/monokai");
-        editor.session.setMode("ace/mode/javascript");
         editor.renderer.setScrollMargin(4, 0);
 
         editor.setOptions({
             maxLines: 20,
             minLines: 5,
+            mode: "ace/mode/javascript",
+            theme: "ace/theme/monokai",
         });
+
+        _ace_editors.push({editor, div});
 
 		return editor;
 	}

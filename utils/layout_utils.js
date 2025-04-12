@@ -38,12 +38,12 @@ let Modal = {
         modal.id = "modal";
         modal.innerHTML = `
             <div class="modal-content">
-                <span class="close">&times;</span>
+                <span class="close2">&times;</span>
                 <h5 style="margin-top: 20px; margin-bottom: 20px">${title}</h5>
             </div>`;
 
         modal.onclick = (event) => { if (event.target == modal) Modal.close(); }
-        modal.querySelector(".close").onclick = Modal.close;
+        modal.querySelector(".close2").onclick = Modal.close;
 
         document.body.appendChild(modal);
         let h5 = modal.querySelector("h5");
@@ -59,7 +59,7 @@ class TabList
     // Requirements on elem_type:
     // required: func on_display, prop name
     // optional: func on_settings
-    constructor(id, elem_type, has_settings = false, has_content = true)
+    constructor(id, elem_type, auto_open_settings = false, has_content = true)
     {
         this.tabs = [];
         this.element = document.querySelector(id);
@@ -71,7 +71,7 @@ class TabList
         li.className = "nav-item nav-link active";
         li.innerText = "+";
         li.$element = null;
-        li.onclick = () => { let x = new elem_type(); if (!this.content) this.ul.children[this.ul.childElementCount-2].onclick(); if (has_settings) x.on_settings(); }
+        li.onclick = () => { let x = new elem_type(); if (!this.content) this.ul.children[this.ul.childElementCount-2].onclick(); if (auto_open_settings) x.on_settings(); }
 
         this.ul.appendChild(li);
         this.element.appendChild(this.ul);
@@ -85,7 +85,7 @@ class TabList
             this.element.appendChild(this.content);
         }
 
-        if (has_settings)
+        if (elem_type.prototype.on_settings != undefined)
         {
             let settings = document.createElement("i");
             settings.className = "fa-solid fa-ellipsis-vertical";
@@ -391,10 +391,21 @@ document.querySelector("#new-project").onclick = () => { deserialize(); set_proj
 
 /// Misc.
 
+let _ace_editors = [];
+
 function repaint_all()
 {
     Plot.tab_list.repaint();
     Fitting.tab_list.repaint();
+
+    _ace_editors = _ace_editors.filter((x) => {
+        if (!x.div.isConnected)
+        {
+            x.editor.destroy();
+            return false;
+        }
+        return true;
+    });
 }
 
 function set_theme(theme)
@@ -480,6 +491,9 @@ function create_editor(content, on_change)
             set_color(undefined, false);
         }, 200);
     });
+
+    // For destroy
+    _ace_editors.push({editor, div});
 
     return div;
 }

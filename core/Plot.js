@@ -88,7 +88,7 @@ class Plot
 					params.push(key);
             }
             else
-                Console.error(func + " is not a Function or a Setting.");
+                Console.error(this.name + ": " + func.name + " is not defined.");
         }
         return [...new Set(params)]; // Remove duplicates
     }
@@ -123,7 +123,11 @@ class Plot
     display_plot()
     {
         // Build traces
-        let traces = this.functions.map(func => this.gen_plot(func));
+        let traces = this.functions
+            .filter(func => Expression.instances.hasOwnProperty(func.name) || Setting.instances.hasOwnProperty(func.name))
+            .map(func => this.gen_plot(func));
+
+        if (traces.length == 0) return;
 
         // Build layout
         let layout = { width: this.element.parentNode.clientWidth - 30, uirevision: true };
@@ -324,6 +328,9 @@ class Plot
 
             for (let i = 0; i < this.functions.length; i++)
             {
+                let expr = Expression.instances[this.functions[i].name];
+                let setting = Setting.instances[this.functions[i].name];
+
                 let elem = document.createElement("li");
                 elem.className = "list-group-item";
                 elem.style = "display: flex";
@@ -338,60 +345,70 @@ class Plot
                     build_settings();
                 }));
 
-                let expr = Expression.instances[this.functions[i].name];
-
-                // Type
-                let type_settings = {
-                    values: [Plot.Types.Line, Plot.Types.Scatter, Plot.Types.Histogram],
-                    disabled_values: [],
-                    width: "100px",
-                };
-
+                if (expr || setting)
                 {
-                    let prevent_line = expr ? expr.is_scatter() : true;
-                    let prevent_scatter = expr ? !expr.is_scatter() : false;
-                    let prevent_histogram = prevent_scatter || this.get_dimensions() == 1;
+                    // Type
+                    let type_settings = {
+                        values: [Plot.Types.Line, Plot.Types.Scatter, Plot.Types.Histogram],
+                        disabled_values: [],
+                        width: "110px",
+                    };
 
-                    if (this.functions[i].type == Plot.Types.Line && prevent_line) this.functions[i].type = prevent_scatter ? Plot.Types.Histogram : Plot.Types.Scatter;
-                    if (this.functions[i].type == Plot.Types.Scatter && prevent_scatter) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
-                    if (this.functions[i].type == Plot.Types.Histogram && prevent_histogram) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
-
-                    if (prevent_line) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Line);
-                    if (prevent_scatter) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Scatter);
-                    if (prevent_histogram) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Histogram);
-                }
-
-                elem.appendChild(create_input("dropdown", this.functions[i].type, type_settings, (new_type) => {
-                    this.functions[i].type = new_type;
-                    build_settings();
-                }));
-
-				// Scatter choice
-                if (this.functions[i].type != Plot.Types.Line)
-                {
-                    let scatter_settings = { label: "Axis", undefined_value: "Auto" };
-                    if (expr)
                     {
-                        let sample_count = create_input("number", this.functions[i].sample_count || 64, { label: "Sample Count" }, (new_count) => {
-                            this.functions[i].sample_count = new_count;
-                        });
-                        elem.appendChild(wrap(sample_count[1], sample_count[0]));
+                        let prevent_line = expr ? expr.is_scatter() : true;
+                        let prevent_scatter = expr ? !expr.is_scatter() : false;
+                        let prevent_histogram = prevent_scatter || this.get_dimensions() == 1;
 
-                        scatter_settings.values = Expression.instances[this.functions[i].name].parameters;
-                    }
-                    else
-                    {
-                        scatter_settings.values = Object.keys(Setting.instances[this.functions[i].name].value);
+                        if (this.functions[i].type == Plot.Types.Line && prevent_line) this.functions[i].type = prevent_scatter ? Plot.Types.Histogram : Plot.Types.Scatter;
+                        if (this.functions[i].type == Plot.Types.Scatter && prevent_scatter) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
+                        if (this.functions[i].type == Plot.Types.Histogram && prevent_histogram) this.functions[i].type = prevent_line ? Plot.Types.Scatter : Plot.Types.Line;
+
+                        if (prevent_line) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Line);
+                        if (prevent_scatter) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Scatter);
+                        if (prevent_histogram) type_settings.disabled_values = type_settings.disabled_values.concat(Plot.Types.Histogram);
                     }
 
-                    scatter_settings.values = [undefined].concat(scatter_settings.values);
-                    let axis = create_input("dropdown", this.functions[i].scatter, scatter_settings, (new_scatter) => {
-                        this.functions[i].scatter = new_scatter;
+                    elem.appendChild(create_input("dropdown", this.functions[i].type, type_settings, (new_type) => {
+                        this.functions[i].type = new_type;
                         build_settings();
-                    });
-                    elem.appendChild(wrap(axis[1], axis[0]));
+                    }));
+
+                    // Scatter choice
+                    if (this.functions[i].type != Plot.Types.Line)
+                    {
+                        let scatter_settings = { label: "Axis", undefined_value: "Auto" };
+                        if (expr)
+                        {
+                            let sample_count = create_input("number", this.functions[i].sample_count || 64, { label: "Sample Count" }, (new_count) => {
+                                this.functions[i].sample_count = new_count;
+                            });
+                            elem.appendChild(wrap(sample_count[1], sample_count[0]));
+
+                            scatter_settings.values = expr.parameters;
+                        }
+                        else
+                        {
+                            scatter_settings.values = Object.keys(Setting.instances[this.functions[i].name].value);
+                        }
+
+                        scatter_settings.values = [undefined].concat(scatter_settings.values);
+                        let axis = create_input("dropdown", this.functions[i].scatter, scatter_settings, (new_scatter) => {
+                            this.functions[i].scatter = new_scatter;
+                            build_settings();
+                        });
+                        elem.appendChild(wrap(axis[1], axis[0]));
+                    }
                 }
 
+                // Remove
+                let cross = document.createElement("span");
+                cross.className = "close2";
+                cross.innerHTML = "&times;";
+                cross.onclick = () => {
+                    this.functions.splice(i, 1);
+                    build_settings();
+                };
+                elem.appendChild(cross);
 
 				list.appendChild(elem);
             }

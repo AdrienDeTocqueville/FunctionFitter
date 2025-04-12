@@ -13,6 +13,7 @@ class Fitting
         this.expression = new Expression(settings.value || "0", this.name);
 
         Fitting.tab_list.add_element(this);
+        Fitting.create_settings_dropdown();
     }
 
     on_display(parent)
@@ -20,6 +21,7 @@ class Fitting
         let repaint = () => {
             parent.innerHTML = "";
 
+            // Inputs
             let inputs = Expression.instances[this.ref].parameters;
             {
                 let input_table = new Table(["Input", "Settings"]);
@@ -40,6 +42,7 @@ class Fitting
                 parent.appendChild(input_table.element);
             }
 
+            // Expression
             {
                 let value_editor = create_editor(this.expression.source, (value) => {
                     return this.expression.set_source(value);
@@ -48,6 +51,7 @@ class Fitting
                 parent.appendChild(document.createElement("br"));
             }
 
+            // Variables
             let variables = Variable.get_dependencies(this.expression.parameters, inputs);
             if (variables.size != 0)
             {
@@ -57,10 +61,20 @@ class Fitting
                 parent.appendChild(var_table.element);
             }
 
-            // Last line
+            // Reference
+
+            let block = document.createElement("div");
+            block.style = "border: 1px solid rgba(0, 0, 0, .125); position: relative; padding-bottom: 3.25rem;";
+
+            var ref_choices = Object.keys(Expression.instances);
+            for (let setting in Setting.instances)
+            {
+                if (Setting.instances[setting].type == 'table')
+                    ref_choices.push(setting);
+            }
 
             let ref_settings = {
-                values: Object.keys(Expression.instances),
+                values: ref_choices,
                 disabled_values: [this.name],
                 label: "Reference",
                 id: "ref-button",
@@ -70,40 +84,48 @@ class Fitting
                 repaint();
             });
 
+            ref[1].style.width = "120px";
+            ref = wrap(ref[1], ref[0]);
+            ref.style = "padding-top: .5rem; padding-left: 8px";
+            block.appendChild(ref);
+
+            let expr = Expression.instances[this.ref];
+            if (!expr || expr.is_scatter())
+            {
+                let scatter_settings = { label: "Axis" };
+
+                if (expr)
+                    scatter_settings.values = expr.parameters;
+                else
+                    scatter_settings.values = Object.keys(Setting.instances[this.ref].value);
+
+                if (scatter_settings.length != 0 && !scatter_settings.values.includes(this.scatter))
+                    this.scatter = scatter_settings.values[0];
+
+                let axis = create_input("dropdown", this.scatter, scatter_settings, (new_scatter) => {
+                    this.scatter = new_scatter;
+                });
+
+                axis[1].style.width = "120px";
+                axis = wrap(axis[1], axis[0]);
+                axis.style = "padding-top: .5rem; padding-left: 8px";
+                block.appendChild(axis);
+            }
+
             let fit_button = document.createElement("button");
             fit_button.className = "btn btn-sm btn-primary";
             fit_button.type = "button";
             fit_button.innerText = "Fit function";
             fit_button.disabled = this.worker != null;
+            fit_button.style = "position: absolute; bottom: .5rem; right: 8px";
             fit_button.onclick = () => {
                 this.fit();
                 repaint_all();
             }
 
-            let dropdown = document.createElement("button");
-            dropdown.className = "btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split";
+            block.appendChild(fit_button)
 
-            let dropdown_item = (txt, onclick) => {
-                let dropdown_item = document.createElement("a");
-                dropdown_item.className = "dropdown-item";
-                dropdown_item.innerText = txt;
-                dropdown_item.onclick = onclick;
-                return dropdown_item;
-            };
-
-            let dropdown_menu = document.createElement("button");
-            dropdown_menu.className = "dropdown-menu";
-            dropdown_menu.innerHTML = ['Dropout', 'Export'].map(i => dropdown_item(i)).join('')
-
-            dropdown_menu.appendChild(dropdown_item('Dropout', () => {}));
-            dropdown_menu.appendChild(dropdown_item('Export', () => this.export()));
-
-            let button_group = wrap(fit_button, dropdown, dropdown_menu);
-            button_group.className = "btn-group";
-
-            let row = wrap(wrap(ref[1], ref[0]), button_group);
-            row.style = "justify-content: space-around";
-            parent.appendChild(row);
+            parent.appendChild(block);
         }
 
         repaint();
@@ -235,5 +257,51 @@ class Fitting
         expr.set_source(result);
         expr.repaint();
         return expr;
+    }
+
+    on_settings()
+    {
+        Fitting.dropdown_menu.style.opacity = 2;
+        Fitting.dropdown_menu.style.visibility = "visible";
+    }
+
+    static create_settings_dropdown()
+    {
+        if (Fitting.dropdown_menu != null)
+            return;
+
+        let dropdown_item = (txt, onclick) => {
+            let dropdown_item = document.createElement("a");
+            dropdown_item.className = "dropdown-item";
+            dropdown_item.innerText = txt;
+            dropdown_item.onclick = onclick;
+            return dropdown_item;
+        };
+
+        let dropdown_menu = document.createElement("div");
+        dropdown_menu.className = "dropdown-menu";
+        dropdown_menu.style = "position: absolute; top: 35px; right: 0px; opacity: 0; visibility: hidden";
+
+        let divider = document.createElement("div");
+        divider.className = "dropdown-divider";
+
+        dropdown_menu.appendChild(dropdown_item('Rename', () => {}));
+        dropdown_menu.appendChild(dropdown_item('Export', () => Fitting.tab_list.active_tab.$element.export()));
+        dropdown_menu.appendChild(divider);
+        dropdown_menu.appendChild(dropdown_item('Delete', () => {
+            Fitting.tab_list.remove(Fitting.tab_list.active_tab.$element);
+        }));
+
+        let parent = Fitting.tab_list.settings.parentElement;
+        parent.insertBefore(dropdown_menu, parent.firstChild);
+
+        Fitting.dropdown_menu = dropdown_menu;
+
+        window.onclick = (event) => {
+            if (Fitting.dropdown_menu.style.opacity == 1)
+                Fitting.dropdown_menu.style.visibility = "hidden";
+            if (Fitting.dropdown_menu.style.opacity > 0)
+                Fitting.dropdown_menu.style.opacity--;
+        };
     }
 }

@@ -109,7 +109,8 @@ h3 { position: relative; }
 }
 .deletable-list:hover .close { display: block; }
 
-.nav-tabs { border-bottom: 0px; cursor: pointer; }
+.nav-tabs { border-bottom: 0px; }
+.nav-item { cursor: pointer; }
 
 #function_list > li { padding: 0; margin-bottom:8px;}
 
@@ -145,6 +146,23 @@ i:hover { color: #aaa; }
     font-size: 30px;
 }
 .close:hover, .close:focus
+{
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.close2
+{
+    color: #aaaaaa;
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: .75rem 1.25rem;
+}
+.close2:hover, .close2:focus
 {
     color: #000;
     text-decoration: none;
