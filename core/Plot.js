@@ -28,11 +28,8 @@ class Plot
                 this.functions[i] = to_func(this.functions[i]);
         }
 
-        this.scatter = settings.scatter || [];
-
         this.axis_1 = settings.axis_1;
         this.axis_2 = settings.axis_2;
-        this.scatter_axis = settings.scatter_axis;
         this.dimensions = settings.dimensions;
         if (this.dimensions == undefined)
             this.dimensions = this.axis_2 ? 1 : 0;
@@ -88,7 +85,7 @@ class Plot
 					params.push(key);
             }
             else
-                Console.error(this.name + ": " + func.name + " is not defined.");
+                Console.error(this.name + ": " + func.name + " is not defined.", this.name);
         }
         return [...new Set(params)]; // Remove duplicates
     }
@@ -497,6 +494,7 @@ class Plot
 				delete_btn.style = "width: 100%; height: 31px;";
 				delete_btn.innerText = "Delete";
 				delete_btn.onclick = () => {
+                    Console.clear(this.name);
 					Plot.tab_list.remove(this);
 					Modal.close();
 				};

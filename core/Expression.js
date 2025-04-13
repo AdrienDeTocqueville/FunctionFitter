@@ -22,6 +22,43 @@ class Expression
         Expression.instances[this.name] = this;
     }
 
+    rename(new_name)
+    {
+        if (this.type != Expression.Types.Unnamed)
+        {
+            if (window[new_name] != undefined)
+                return false;
+        }
+
+        if (Expression.instances[new_name] != undefined)
+            return false;
+
+        // Clean references to old name
+        if (Expression.instances[this.name] != undefined)
+        {
+            if (this.type != Expression.Types.Unnamed)
+                delete window[this.name];
+
+            delete Expression.instances[this.name];
+
+            for (let plot of Plot.tab_list.tabs)
+            {
+                for (let func of plot.functions)
+                {
+                    if (func.name == this.name)
+                        func.name = new_name;
+                }
+            }
+        }
+
+        // Rename
+        this.name = new_name;
+        if (this.type != Expression.Types.Unnamed)
+            window[this.name] = this.function;
+        Expression.instances[this.name] = this;
+        return true;
+    }
+
     set_source(source)
     {
         if (this.type != Expression.Types.Unnamed)
@@ -34,16 +71,11 @@ class Expression
                 this.parse_parameters();
 
                 // Handle Renaming
-                if (this.name != this.function.name && window[this.name] != undefined)
+                if (this.name != this.function.name)
                 {
-                    delete Expression.instances[this.name];
-                    delete window[this.name];
-                    for (let plot of Plot.tab_list.tabs)
-                        plot.functions = plot.functions.map(f => f == this.name ? this.function.name : f);
+                    if (!this.rename(this.function.name))
+                        throw new Error(`New name is invalid: ${this.function.name}.`);
                 }
-                this.name = this.function.name;
-                Expression.instances[this.name] = this;
-                window[this.name] = this.function;
 
                 // Remove previous compilation error messages
                 Console.clear(this.name);
@@ -164,7 +196,7 @@ class Expression
             theme: "ace/theme/monokai",
         });
 
-        _ace_editors.push({editor, div});
+        register_editor_for_gc(editor);
 
 		return editor;
 	}

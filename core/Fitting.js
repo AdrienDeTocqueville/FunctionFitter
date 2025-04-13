@@ -8,6 +8,8 @@ class Fitting
 
         this.ref = settings.ref || Object.keys(Expression.instances)[0];
         if (this.ref instanceof Function) this.ref = this.ref.name;
+        this.samples = settings.samples;
+        this.scatter = settings.scatter;
 
         this.constant = new Set(settings.constant);
         this.expression = new Expression(settings.value || "0", this.name);
@@ -20,20 +22,21 @@ class Fitting
     {
         let repaint = () => {
             parent.innerHTML = "";
+            garbage_collect_editors();
 
             let expr = Expression.instances[this.ref];
             let setting = Setting.instances[this.ref];
             let is_scatter = (!expr || expr.is_scatter());
 
             // Inputs
-            let inputs = expr ? expr.parameters : Object.keys(setting.value);
-            if (is_scatter)
-                inputs = inputs.filter((i) => i != this.scatter);
-            else
+            let inputs = expr ? expr.parameters : setting ? Object.keys(setting.value) : [];
             {
                 let input_table = new Table(["Input", "Settings"]);
                 for (let i = 0; i < inputs.length; i++)
                 {
+                    if (is_scatter && inputs[i] == this.scatter)
+                        continue;
+
                     let constant = this.constant.has(inputs[i]);
                     let checkbox = create_input("checkbox", !constant, {label: inputs[i]}, (trainable) => {
                         if (trainable)
@@ -98,8 +101,8 @@ class Fitting
                 repaint();
             }));
 
-            let valid_ref = true;
-            if (is_scatter)
+            let valid_ref = expr != undefined || setting != undefined;
+            if (is_scatter && valid_ref)
             {
                 let scatter_settings = { label: "Axis" };
 
@@ -164,23 +167,25 @@ class Fitting
         let setting = Setting.instances[this.ref];
         let is_scatter = (!expr || expr.is_scatter());
 
-        let axes, dataset;
+        let inputs = expr ? expr.parameters : Object.keys(setting.value);
+        let axes = inputs.filter(v => !this.constant.has(v));
+        axes = axes.map(v => Variable.get(v));
+
+        let dataset;
         if (is_scatter)
         {
-            axes = ref.parameters .filter(v => v != this.scatter) .map(v => Variable.get(v));
+            axes = axes.filter(v => v.name != this.scatter);
             dataset = this.build_scatter_dataset(axes, expr, setting);
         }
         else
         {
-            let ref = Expression.instances[this.ref];
-            axes = ref.parameters .filter(v => !this.constant.has(v)) .map(v => Variable.get(v));
-            dataset = this.build_dataset(axes, ref.compile(axes));
+            dataset = this.build_dataset(axes, expr.compile(axes));
         }
 
         // Compute initial values
         let axis_count = axes.length;
         let initial_values = [];
-        for (let v of Variable.get_dependencies(this.expression.parameters, axes))
+        for (let v of Variable.get_dependencies(this.expression.parameters, inputs))
         {
             if (v.is_number() && !this.constant.has(v.name))
             {
@@ -246,10 +251,10 @@ class Fitting
                     for (let j = 0; j < num_axis; j++)
                     {
                         let val = sample[axes[j].name];
-                        x_values[j] = val != undefined ? val : 0;
+                        x_values[i][j] = val != undefined ? val : 0;
                     }
 
-                    y_values = sample[this.scatter];
+                    y_values[i] = sample[this.scatter];
                 }
             } catch (error) {
                 Console.error(expr.name + ': ' + error, expr.name);
@@ -262,10 +267,11 @@ class Fitting
 
             for (let i = 0; i < x_values.length; i++)
             {
+                x_values[i] = new Array(num_axis);
                 for (let j = 0; j < num_axis; j++)
                 {
                     let val = setting.value[axes[j].name];
-                    x_values[j] = val != undefined ? val : 0;
+                    x_values[i][j] = val != undefined ? val[i] : 0;
                 }
             }
         }
@@ -341,6 +347,19 @@ class Fitting
         Fitting.dropdown_menu.style.visibility = "visible";
     }
 
+    rename(new_name)
+    {
+        if (!this.expression.rename(new_name))
+            return false;
+
+        // Rename the model and UI
+        let node = Fitting.tab_list.get_dom_node(this);
+        node.innerText = new_name;
+        this.name = new_name;
+
+        return true;
+    }
+
     static create_settings_dropdown()
     {
         if (Fitting.dropdown_menu != null)
@@ -361,12 +380,14 @@ class Fitting
         let divider = document.createElement("div");
         divider.className = "dropdown-divider";
 
-        dropdown_menu.appendChild(dropdown_item('Rename', () => {}));
+        dropdown_menu.appendChild(dropdown_item('Rename', () => {
+            let self = Fitting.tab_list.active_tab.$element;
+            Modal.open("Rename Model", project_modal_content(self.name, "Rename", (new_name) => self.rename(new_name)));
+            document.querySelector("#modal input").focus();
+        }));
         dropdown_menu.appendChild(dropdown_item('Export', () => Fitting.tab_list.active_tab.$element.export()));
         dropdown_menu.appendChild(divider);
-        dropdown_menu.appendChild(dropdown_item('Delete', () => {
-            Fitting.tab_list.remove(Fitting.tab_list.active_tab.$element);
-        }));
+        dropdown_menu.appendChild(dropdown_item('Delete', () => Fitting.tab_list.remove(Fitting.tab_list.active_tab.$element)));
 
         let parent = Fitting.tab_list.settings.parentElement;
         parent.insertBefore(dropdown_menu, parent.firstChild);

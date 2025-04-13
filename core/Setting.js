@@ -120,7 +120,7 @@ class Setting
                 });
 
 				let parse = create_input("button", null, {innerText: "Parse", style: "margin-bottom: 15px"}, () => {
-					let parsed = parse_table(text_area.value);
+					let parsed = parse_settings_table(text_area.value);
 					if (parsed == undefined) return;
 
 					function pad_table(table, value) {

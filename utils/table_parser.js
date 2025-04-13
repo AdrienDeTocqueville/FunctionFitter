@@ -1,4 +1,4 @@
-function parse_table(txt)
+function parse_settings_table(txt)
 {
 	try {
 		let data;
@@ -21,7 +21,7 @@ function parse_table(txt)
 }
 
 /*
-function parse_table(table_str)
+function parse_settings_table(table_str)
 {
 	let lines = table_str.trim().split("\n");
 	let sample_count_f = lines.length - 1;

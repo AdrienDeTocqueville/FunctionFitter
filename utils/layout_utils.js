@@ -129,17 +129,21 @@ class TabList
             li.onclick();
     }
 
-    remove(elem)
+    get_dom_node(elem)
     {
-        let li = undefined;
-        for (let i of this.ul.childNodes)
+        for (let li of this.ul.childNodes)
         {
-            if (elem == i.$element)
+            if (elem == li.$element)
             {
-                li = i;
-                break;
+                return li;
             }
         }
+        return undefined;
+    }
+
+    remove(elem)
+    {
+        let li = get_dom_node(elem);
 
         let idx = undefined;
         for (let i = 0; i < this.tabs.length; i++)
@@ -392,20 +396,29 @@ document.querySelector("#new-project").onclick = () => { deserialize(); set_proj
 /// Misc.
 
 let _ace_editors = [];
+function register_editor_for_gc(editor)
+{
+    _ace_editors.push(editor)
+}
+function garbage_collect_editors()
+{
+    // Delete all editors that are not connected to the DOM
+    // Way easier to do it that way instead of deleting them when they are not used
+    _ace_editors = _ace_editors.filter((x) => {
+        if (!x.container.isConnected)
+        {
+            x.destroy();
+            return false;
+        }
+        return true;
+    });
+}
 
 function repaint_all()
 {
     Plot.tab_list.repaint();
     Fitting.tab_list.repaint();
-
-    _ace_editors = _ace_editors.filter((x) => {
-        if (!x.div.isConnected)
-        {
-            x.editor.destroy();
-            return false;
-        }
-        return true;
-    });
+    garbage_collect_editors();
 }
 
 function set_theme(theme)
@@ -493,7 +506,7 @@ function create_editor(content, on_change)
     });
 
     // For destroy
-    _ace_editors.push({editor, div});
+    register_editor_for_gc(editor);
 
     return div;
 }

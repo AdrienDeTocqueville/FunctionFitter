@@ -23,13 +23,13 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 // Modal
-function project_modal_content (callback)
+function project_modal_content(initial_value, button_text, callback)
 {
     let content = document.createElement("div");
     content.className = "single-line";
     content.innerHTML = `
-        <input class="form-control" type="text" value="${loaded_project || ""}">
-        <button class="btn btn-success" style="padding-left: 15px 0; margin-left: 10px;">Save</button>
+        <input class="form-control" type="text" value="${initial_value || ""}">
+        <button class="btn btn-success" style="padding-left: 15px 0; margin-left: 10px;">${button_text}</button>
     `;
 
     content.querySelector("input").onkeyup = (e) => {
@@ -40,9 +40,8 @@ function project_modal_content (callback)
     content.querySelector("button").onclick = () => {
         let name = document.querySelector("#modal input").value;
         if (/^\s*$/.test(name)) return; // empty
-        set_project_name(name);
-        Modal.close();
-        callback();
+        if (callback(name))
+            Modal.close();
     }
 
     return content;
@@ -50,13 +49,15 @@ function project_modal_content (callback)
 
 document.querySelector("#project-name").onclick = () => {
     let previous_name = loaded_project;
-    Modal.open("Rename Project", project_modal_content(() => {
+    Modal.open("Rename Project", project_modal_content(loaded_project, "Rename", (new_name) => {
+        set_project_name(new_name);
         if ($projects[previous_name])
         {
             $projects[loaded_project] = $projects[previous_name];
             delete $projects[previous_name];
             save_projects();
         }
+        return true;
     }));
     document.querySelector("#modal input").focus();
 }
@@ -64,7 +65,11 @@ document.querySelector("#project-name").onclick = () => {
 document.querySelector("#save").onclick = () => {
     if (loaded_project == null)
     {
-        Modal.open("Save As", project_modal_content(save_project));
+        Modal.open("Save As", project_modal_content(loaded_project, "Save", (new_name) => {
+            set_project_name(new_name);
+            save_project();
+            return true;
+        }));
         document.querySelector("#modal input").focus();
     }
     else
@@ -185,6 +190,8 @@ function serialize()
             constant: [...model.constant],
             value: model.expression.source,
             ref: model.ref,
+            scatter: model.scatter,
+            samples: model.samples,
         };
     }
 
@@ -193,7 +200,6 @@ function serialize()
         serialized.plots[plot.name] = {
             axis_1: plot.axis_1,
             axis_2: plot.axis_2,
-            scatter_axis: plot.scatter_axis,
             dimensions: plot.dimensions,
             functions: plot.functions,
         };
