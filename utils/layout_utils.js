@@ -143,7 +143,7 @@ class TabList
 
     remove(elem)
     {
-        let li = get_dom_node(elem);
+        let li = this.get_dom_node(elem);
 
         let idx = undefined;
         for (let i = 0; i < this.tabs.length; i++)
@@ -381,6 +381,7 @@ function set_project_drawer(open)
         this.drawer_opened = true;
         document.querySelector("#drawer").setAttribute('project-drawer', 'opened');
         document.querySelector("main").setAttribute('project-drawer', 'opened');
+        Sheet.close_editor();
     }
     else
     {

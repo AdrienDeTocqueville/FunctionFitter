@@ -104,7 +104,7 @@ class Fitting
             let valid_ref = expr != undefined || setting != undefined;
             if (is_scatter && valid_ref)
             {
-                let scatter_settings = { label: "Axis" };
+                let scatter_settings = { label: "Output" };
 
                 if (expr)
                     scatter_settings.values = expr.parameters;
@@ -313,13 +313,20 @@ class Fitting
 
     export()
     {
-        let ref = Expression.instances[this.ref];
+        let expr = Expression.instances[this.ref];
+        let setting = Setting.instances[this.ref];
+        let is_scatter = (!expr || expr.is_scatter());
 
-        let export_name = "export_" + this.name;
-        let axes = ref.parameters .filter(v => !this.constant.has(v)) .map(v => Variable.get(v));
+        let inputs = expr ? expr.parameters : Object.keys(setting.value);
+        let axes = inputs.filter(v => !this.constant.has(v));
+        axes = axes.map(v => Variable.get(v));
+        if (is_scatter)
+            axes = axes.filter(v => v.name != this.scatter);
+
         let dependencies = Variable.get_dependencies(this.expression.parameters, axes);
         axes = axes.map(v => (v instanceof Variable) ? v.name : v);
 
+        let export_name = "export_" + this.name;
         let result =`function ${export_name}(${axes.join(', ')})\n`;
         result += '{\n';
 
@@ -332,13 +339,13 @@ class Fitting
         result += `\treturn ${this.expression.source};\n`;
         result += '}\n';
 
-        let expr = Expression.instances[export_name];
-        if (expr == undefined)
+        let exported = Expression.instances[export_name];
+        if (exported == undefined)
             return new Expression(result);
 
-        expr.set_source(result);
-        expr.repaint();
-        return expr;
+        exported.set_source(result);
+        exported.repaint();
+        return exported;
     }
 
     on_settings()

@@ -72,17 +72,25 @@ class Plot
         return scatter_axis;
     }
 
-    get_parameters()
+    get_parameters(no_scatter = false)
     {
         let params = [];
         for (let func of this.functions)
         {
-            if (func.name in Expression.instances)
-                params = params.concat(Expression.instances[func.name].parameters);
+            let expr = Expression.instances[func.name];
+            if (expr)
+            {
+                if (no_scatter && expr.type == Expression.Types.Scatter)
+                    continue;
+                params = params.concat(expr.parameters);
+            }
             else if (func.name in Setting.instances)
             {
-				for (let key of Object.keys(Setting.instances[func.name].value))
-					params.push(key);
+                if (!no_scatter)
+                {
+                    for (let key of Object.keys(Setting.instances[func.name].value))
+                        params.push(key);
+                }
             }
             else
                 Console.error(this.name + ": " + func.name + " is not defined.", this.name);
@@ -104,7 +112,7 @@ class Plot
         // Build sliders
         grid.style = "display: flex; flex-wrap: wrap; gap: 4px 20px;";
         let axes = [this.get_axis_1(), this.get_axis_2()];
-        for (let variable of Variable.get_dependencies(this.get_parameters(), axes))
+        for (let variable of Variable.get_dependencies(this.get_parameters(true), axes))
         {
             if (!variable.is_number())
                 continue;
@@ -301,6 +309,14 @@ class Plot
 		return trace;
 	}
 
+    rename(new_name)
+    {
+        Plot.tab_list.get_dom_node(this).innerText = new_name;
+        this.name = new_name;
+
+        return true;
+    }
+
     on_settings()
     {
         let content = document.createElement("div");
@@ -397,7 +413,7 @@ class Plot
 
                         if (expr)
                         {
-                            let sample_count = create_input("number", func.sample_count || 64, { label: "Samples", width: "50px" }, (new_count) => {
+                            let sample_count = create_input("number", func.sample_count || 64, { label: "Samples", width: "50px", id: func.name + func.scatter }, (new_count) => {
                                 func.sample_count = new_count;
                             });
                             li.appendChild(wrap(sample_count[1], sample_count[0]));
@@ -487,6 +503,24 @@ class Plot
 
                 content.appendChild(table.element);
             }
+
+			{
+                let self = this;
+				let rename_btn = document.createElement("button");
+				rename_btn.className = "btn btn-light center-text";
+                rename_btn.style = "width: 100%; height: 31px; margin-bottom: 10px; border-color: #bbbbbb";
+				rename_btn.innerText = "Rename";
+				rename_btn.onclick = () => {
+					Modal.close();
+                    Modal.open("Rename Plot", project_modal_content(self.name, "Rename", (new_name) => {
+                        let success = self.rename(new_name);
+                        if (success) self.on_settings();
+                        return success;
+                    }));
+				};
+
+				content.appendChild(rename_btn);
+			}
 
 			{
 				let delete_btn = document.createElement("button");
