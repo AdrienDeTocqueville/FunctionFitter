@@ -238,66 +238,28 @@ class Table
 
 /// LUTS
 
-function load_lut_async(url, name, canvas)
+function load_lut(url, canvas, on_load)
 {
-    return new Promise((resolve, reject) => {
-        let img = new Image();
-        img.setAttribute('crossOrigin', '');
-        img.onload = () => {
-            let context = canvas.getContext('2d');
+    let img = new Image();
+    img.setAttribute('crossOrigin', '');
+    img.onload = () => {
+        let context = canvas.getContext('2d');
 
-            context.setTransform(1, 0, 0, 1, 0, 0);
-            context.scale(canvas.width / img.width, canvas.height / img.height);
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.scale(canvas.width / img.width, canvas.height / img.height);
 
-            context.clearRect(0, 0, img.width, img.height);
-            context.drawImage(img, 0, 0);
-            Setting.instances[name].image = context.getImageData(0, 0, img.width, img.height);
+        context.clearRect(0, 0, img.width, img.height);
+        context.drawImage(img, 0, 0);
 
-            Plot.repaint();
-            resolve(Setting.instances[name]);
-        };
-        img.onerror = reject;
-        img.src = url;
-    });
+        on_load(context.getImageData(0, 0, img.width, img.height));
+    };
+    img.src = url;
 }
 
-function add_lut(name, url, bilinear = true)
+function sample_lut(x, y, channel)
 {
-    if (name == null)
-        name = url.replace(/\.[^/.]+$/, "");
-
-    let canvas = document.createElement("canvas");
-    canvas.className = "lut-canvas";
-    canvas.style = "margin-right: 20px";
-    canvas.width = canvas.height = 64;
-    canvas.onclick = async () => {
-        const pickerOpts = {
-            types: [{
-                description: 'Images',
-                accept: { 'image/*': ['.png', '.gif', '.jpeg', '.jpg'] }
-            }],
-            excludeAcceptAllOption: true,
-            multiple: false
-        };
-        [fileHandle] = await window.showOpenFilePicker(pickerOpts);
-        let file = await fileHandle.getFile();
-        let fr = new FileReader();
-        fr.readAsDataURL(file);
-        fr.onloadend = function() {
-            load_lut_async(fr.result, name, canvas);
-        }
-    }
-
-    let lut_sampler = new Function('x', 'y', 'channel', `return sample_lut('${name}', x, y, channel)`);
-    add_setting(name, "lut", lut_sampler, { bilinear, canvas, url });
-
-    return url != null ? load_lut_async(url, name, canvas) : null;
-}
-
-function sample_lut(name, x, y, channel)
-{
-    let lut = Setting.instances[name], data = lut.image;
-    if (data == null) return 0;
+    let data = this.value;
+    if (data == null || data.data == null) return 0;
 
     x = saturate(x) * (data.width - 1);
     y = saturate(y) * (data.height - 1);
@@ -305,10 +267,10 @@ function sample_lut(name, x, y, channel)
     function load_lut(x, y)
     {
         coord = (x + y * data.width) * 4;
-        return data.data[coord + channel] / 255;
+        return data.data[coord + channel] / 255.0;
     }
 
-    if (!lut.settings.bilinear)
+    if (!this.settings.bilinear)
         return load_lut(Math.round(x), Math.round(y));
 
     let x_low = Math.floor(x);
@@ -515,32 +477,41 @@ function create_editor(content, on_change)
 // type: [lut, dropdown, checkbox, number, range, text, button]
 function create_input(type, value, settings, onChange)
 {
+    let input, valid_html_for = false;
     if (type == "lut")
     {
-        let label = document.createElement("label");
-        label.htmlFor = settings.canvas.id;
-        label.innerText = settings.label;
+        input = document.createElement("canvas");
+        input.className = "lut-canvas";
+        input.style = "margin-right: 20px";
+        input.width = input.height = 32;
 
-        let [box, box_label] = create_input("checkbox", settings.bilinear, {label: "Bilinear Filtering", id: "bilinear-" + name}, () => {
-            settings.bilinear = box.checked;
-            Plot.repaint();
-        });
+        {
+            // Make the thing yellow
+            let context = input.getContext('2d');
+            context.setTransform(1, 0, 0, 1, 0, 0);
+            context.fillStyle = "#ff6";
+            context.fillRect(0, 0, input.width, input.height);
+        }
 
-        let div = document.createElement("div");
-        div.style = "padding-top: 9px";
-        div.appendChild(box);
-        div.appendChild(box_label);
-
-        let input = document.createElement("div");
-        input.appendChild(label);
-        input.appendChild(div);
-
-        return [input, settings.canvas];
+        input.onclick = async () => {
+            const pickerOpts = {
+                types: [{
+                    description: 'Images',
+                    accept: { 'image/*': ['.png', '.gif', '.jpeg', '.jpg'] }
+                }],
+                excludeAcceptAllOption: true,
+                multiple: false
+            };
+            [fileHandle] = await window.showOpenFilePicker(pickerOpts);
+            let file = await fileHandle.getFile();
+            let fr = new FileReader();
+            fr.readAsDataURL(file);
+            fr.onloadend = function() {
+                load_lut(fr.result, input, onChange);
+            }
+        }
     }
-
-
-    let input, valid_html_for = false;
-    if (type == "dropdown")
+    else if (type == "dropdown")
     {
         input = document.createElement("div");
         input.className = "btn-group";
@@ -700,6 +671,9 @@ function create_input(type, value, settings, onChange)
     }
     else
     {
+        if (type == "lut")
+            width = "initial";
+
         let style = `width: ${width}; padding: 0 8px; margin-right: 8px;`;
         if (type == 'checkbox') style = "margin-right: 5px;";
         if (type == 'dropdown') style = `width: ${width}; margin-right: 8px;`;

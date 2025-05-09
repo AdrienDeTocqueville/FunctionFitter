@@ -1,11 +1,8 @@
-if (!deserialize($projects["FGD"]))
-{
-    function model_f (x, a0, b0, c0, a1, b1, c1)
+register_sample("FGD", () => {
+
+    function model_f(NdotV, p1, p2)
     {
-        let [NdotV, roughness] = x;
-        let b = polynom(roughness, a0, b0, c0);
-        let d = polynom(roughness, a1, b1, c1);
-        return polynom(NdotV - 0.74, 0, b, 0, d);
+        return polynom(NdotV - 0.74, 0, p1, 0, p2);
     }
     function fgd_ref(NdotV, roughness)
     {
@@ -49,20 +46,25 @@ if (!deserialize($projects["FGD"]))
 
     async function main()
     {
-        await add_lut("FGD_LUT", "samples/FGD_64.png");
-        add_setting("TRANSFORM_FGD", "checkbox", true);
-        add_setting("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
+        new Setting("FGD_LUT", "lut", "samples/FGD_64.png", {bilinear: true});
+        new Setting("TRANSFORM_FGD", "checkbox", true);
+        new Setting("FGD_LAYER", "number", 0 , {values: ["F", "G", "D"], dropdown: false});
 
         new Expression(fgd_ref);
         new Expression(fgd_lazarov);
+        new Expression(model_f);
 
-        new Fitting({ref: fgd_ref});
+        new Fitting({
+            ref: fgd_ref,
+            value: "model_f(NdotV, polynom(roughness, a0, b0, c0), polynom(roughness, a1, b1, c1))",
+        }, "fgd_fit");
 
         new Plot({
+            axis_1: "NdotV",
+            axis_2: "roughness",
+
             functions: [fgd_ref, fgd_lazarov],
         });
-
-        set_project_name("FGD");
     }
     main()
-}
+});

@@ -4,6 +4,15 @@ class Setting
 
 	static default_button = 'Console.log("Hello")';
 
+    static Types = [
+        "number",
+        "range",
+        "checkbox",
+        "button",
+        "lut",
+        "table"
+    ];
+
     constructor(name, type, initial_value, settings = {}, refresh_ui = true)
     {
         if (window[name] != undefined)
@@ -32,7 +41,7 @@ class Setting
 			innerText: this.settings.label,
 		};
 
-		let input, label
+		let input, label;
 		if (this.type == "table")
 		{
 			settings.innerText = "Open";
@@ -68,19 +77,18 @@ class Setting
 			if (this.settings.integer)
 				value = round(value);
 		}
-        if (this.type == "button" && !this.settings.label)
-		{
-			this.settings.label = Setting.default_button;
-		}
+
+        this.value = value;
+
+        if (this.type == "lut")
+            value = sample_lut.bind(this);
 
         window[this.name] = value;
-        this.value = value;
     }
 
     set_type(type)
     {
-        let allowed = ["number", "range", "checkbox", "button", "text", "lut", "table"];
-        if (!allowed.includes(type))
+        if (!Setting.Types.includes(type))
         {
             Console.error("Unknown settings type: " + type);
             return;
@@ -93,6 +101,10 @@ class Setting
             if (this.settings.max == undefined) this.settings.max = 1;
             this.set_value(this.value); // clamp
         }
+        if (type == "button" && !this.settings.label)
+		{
+			this.settings.label = Setting.default_button;
+		}
     }
 
 	table_editor()
@@ -266,7 +278,7 @@ class Setting
                 let type_settings = {
                     label: name,
 
-                    values: ["number", "range", "checkbox", "button", "LUT (todo)", "table"],
+                    values: Setting.Types,
                     width: '150px',
                 };
                 var [type, label] = create_input('dropdown', src.type, type_settings, (new_type) => {
@@ -295,6 +307,13 @@ class Setting
                 {
                     settings = create_input("button", null, {innerText: "Open"}, src.table_editor.bind(src));
                 }
+                else if (src.type == "lut")
+                {
+                    settings = create_input("checkbox", src.settings.bilinear, {label: "Bilinear Filtering", id: "bilinear-" + name}, (new_val) => {
+                        src.settings.bilinear = new_val;
+					});
+                    settings = wrap(settings[1], settings[0]);
+                }
 
                 add_list_element(content, "display: flex; flex-direction: row", [label, type, settings], (li) => {
                     delete Setting.instances[name];
@@ -305,7 +324,9 @@ class Setting
 
             content.appendChild(document.createElement("hr"));
 
-            let new_name = create_input("text", "", { callback: (new_text) => {
+            let new_name = create_input("text", "", {
+                id: "add-setting",
+                callback: (new_text) => {
 				let name = new_text.trim().toUpperCase();
 				create_btn.disabled = name == "" || window[name] != undefined;
 			} });
