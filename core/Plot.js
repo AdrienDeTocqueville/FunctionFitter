@@ -289,6 +289,7 @@ class Plot
 			if (func.type == Plot.Types.Histogram)
 			{
 				trace.type = 'histogram';
+                trace.histnorm = "probability";
 				//trace.autobinx = false;
 				//trace.xbins = {
 				//	start: 0.9,

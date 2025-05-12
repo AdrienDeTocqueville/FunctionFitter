@@ -1,4 +1,7 @@
 
+const PI = Math.PI;
+const INV_PI = 1.0 / Math.PI;
+
 function element_wise(action, vector_args, scalar_args)
 {
 	if (scalar_args == undefined) scalar_args = [];
@@ -74,6 +77,57 @@ function float4(x, y, z, w) { return new Proxy([x || 0, y || 0, z || 0, w || 0],
 
 function random(min = 0, max = 1) { return Math.random() * (max - min) + min; }
 function truncate(x, precision=2) { return Number(x.toFixed(precision)); }
+
+class Random
+{
+    static splitmix32(a) {
+        a |= 0;
+        a = a + 0x9e3779b9 | 0;
+        let t = a ^ a >>> 16;
+        t = Math.imul(t, 0x21f0aaad);
+        t = t ^ t >>> 15;
+        t = Math.imul(t, 0x735a2d97);
+        return (t ^ t >>> 15);
+    }
+    static rnd()
+    {
+        Random.state = Random.splitmix32(Random.state);
+        return (Random.state >>> 0) / 4294967296;
+    }
+
+    static state = Random.splitmix32(0x42);
+    static init(seed) { Random.state = seed; }
+
+    static line(min = 0, max = 1) { return Random.rnd() * (max - min) + min; }
+    static area(min = float2(0,0), max = float2(1,1)) { return float2(Random.line(min.x, max.x), Random.line(min.y, max.y)); }
+
+    // Samples a gaussian distribution with mean=0 and std_dev=1
+    static gaussian()
+    {
+        let u = Random.rnd();
+        let v = Random.rnd();
+        return sqrt(-2.0 * log(max(u, 0.00001))) * cos(PI * v);
+    }
+
+    static circle()
+    {
+        let r = sqrt(Random.rnd());
+        let theta = Random.rnd() * 2.0 * PI;
+        return float2(r * cos(theta), r * sin(theta));
+    }
+    static sphere()
+    {
+        let theta = 2.0 * PI * Random.rnd();
+        let cosPhi = 2 * Random.rnd() - 1;
+        let sinPhi = sqrt(1 - cosPhi * cosPhi);
+        return float3(sinPhi * cos(theta), sinPhi * sin(theta), cosPhi);
+    }
+    static hemisphere(n = float3(0, 0, 1))
+    {
+        let p = Random.sphere(); 
+        return dot(n, p) >= 0 ? p : float3(-p.x, -p.y, -p.z);
+    }
+}
 
 function polynom(x)
 {

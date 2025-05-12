@@ -77,6 +77,9 @@ class Expression
                         throw new Error(`New name is invalid: ${this.function.name}.`);
                 }
 
+                // Update in global scope
+                window[this.name] = this.function;
+
                 // Remove previous compilation error messages
                 Console.clear(this.name);
             } catch (error) {

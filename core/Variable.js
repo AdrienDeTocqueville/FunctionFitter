@@ -183,8 +183,8 @@ class Variable
     {
         let form = Setting.build_slider_form(this.name, this.min, this.max, this.resolution);
 
-        form[0].onchange = (e) => { this.min = min(e.target.valueAsNumber, this.max); }
-        form[1].onchange = (e) => { this.max = max(e.target.valueAsNumber, this.min); }
+        form[0].onchange = (e) => { this.min = min(e.target.valueAsNumber, this.max); this.value = clamp(this.value, this.min, this.max); }
+        form[1].onchange = (e) => { this.max = max(e.target.valueAsNumber, this.min); this.value = clamp(this.value, this.min, this.max); }
         form[2].onchange = (e) => { e.target.value = this.resolution = max(e.target.valueAsNumber, 2); }
 
         return form;
